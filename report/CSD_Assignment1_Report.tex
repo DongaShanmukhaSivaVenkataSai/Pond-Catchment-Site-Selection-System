@@ -10,6 +10,7 @@
 \usepackage{amsfonts}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{float}
 
 % Compact float and list spacing for <= 10 pages target
 \setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
@@ -111,23 +112,24 @@ Table~\ref{tab:requirements} maps each functional requirement to its implementat
 \label{sec:architecture}
 The platform is designed as an integrated, three-tier geospatial system connecting an interactive browser-based Web GIS frontend to a high-performance Python ASGI backend. Figure~\ref{fig:architecture} presents the system architecture, illustrating the component breakdown across tiers and the bidirectional communication bridge linking them.
 
-\begin{figure*}[t]
+\begin{figure}[H]
   \centering
+  \resizebox{\linewidth}{!}{%
   \begin{tikzpicture}[
     font=\sffamily\small,
-    node distance=9mm and 12mm,
-    tier/.style={draw=black!70, rounded corners=5pt, line width=0.9pt, align=left, inner sep=8pt, text width=14.0cm},
+    node distance=6mm and 8mm,
+    tier/.style={draw=black!70, rounded corners=4pt, line width=0.85pt, align=left, inner sep=6pt, text width=14.0cm},
     client/.style={tier, fill=teal!10, draw=teal!80},
     bridge/.style={tier, fill=orange!12, draw=orange!85},
     server/.style={tier, fill=blue!10, draw=blue!80},
-    flowlabel/.style={font=\sffamily\footnotesize\bfseries, align=center, fill=white, inner sep=2.5pt},
-    biarr/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, line width=1.2pt, draw=black!75}
+    flowlabel/.style={font=\sffamily\scriptsize\bfseries, align=center, fill=white, inner sep=2pt},
+    biarr/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, line width=1.1pt, draw=black!75}
   ]
 
     % Tier 1: Frontend
     \node[client] (frontend) {%
       \textbf{\large\color{teal!80!black} 1. Frontend Presentation Tier (Web GIS Client)} \hfill \normalfont\footnotesize \texttt{http://10.1.75.51:5252}\\
-      \vspace{2pt}\hrule\vspace{4pt}
+      \vspace{1.5pt}\hrule\vspace{3.5pt}
       $\bullet$ \textbf{Interactive Map Canvas:} Leaflet 1.9.4 with authenticated CARTO Dark Matter and Esri Satellite basemaps.\\
       $\bullet$ \textbf{Land Area Selection:} Leaflet.Draw polygon bounding tool paired with Turf.js spatial boundary clipping.\\
       $\bullet$ \textbf{Real-Time Hydrology HUD:} Floating metrics card displaying catchment area, expected water volume, and depth.\\
@@ -135,9 +137,9 @@ The platform is designed as an integrated, three-tier geospatial system connecti
     };
 
     % Tier 2: Network & Gateway Bridge
-    \node[bridge, below=8mm of frontend] (gateway) {%
+    \node[bridge, below=6mm of frontend] (gateway) {%
       \textbf{\large\color{orange!85!black} 2. Network Bridge \& API Gateway (FastAPI ASGI)} \hfill \normalfont\footnotesize Port Forwarding: \texttt{5252} $\longleftrightarrow$ \texttt{5000}\\
-      \vspace{2pt}\hrule\vspace{4pt}
+      \vspace{1.5pt}\hrule\vspace{3.5pt}
       $\bullet$ \textbf{Port Forwarding Pipeline:} External routing from public host \texttt{10.1.75.51:5252} to internal container port \texttt{5000}.\\
       $\bullet$ \textbf{Asynchronous Client-Server Connector:} \texttt{frontend/js/api.js} REST client with origin auto-detection.\\
       $\bullet$ \textbf{FastAPI Application Server:} StaticFiles asset mounting at root \texttt{/}, CORS middleware, and OpenAPI docs (\texttt{/docs}).\\
@@ -145,9 +147,9 @@ The platform is designed as an integrated, three-tier geospatial system connecti
     };
 
     % Tier 3: Backend Hydrological Engine
-    \node[server, below=8mm of gateway] (backend) {%
+    \node[server, below=6mm of gateway] (backend) {%
       \textbf{\large\color{blue!80!black} 3. Backend Hydrological Analytical Engine} \hfill \normalfont\footnotesize Python 3.10+ / SciPy / NumPy / Shapely\\
-      \vspace{2pt}\hrule\vspace{4pt}
+      \vspace{1.5pt}\hrule\vspace{3.5pt}
       $\bullet$ \textbf{Coordinate Reprojection:} \texttt{projection.py} transforms geographic WGS84 coordinates to conformal UTM Zone 44N metric.\\
       $\bullet$ \textbf{DEM Surface Generation:} \texttt{dem\_builder.py} applies 2D Delaunay bivariate linear interpolation ($\delta = 1.0\,\text{m}$ resolution).\\
       $\bullet$ \textbf{Terrain Derivative Modeling:} \texttt{terrain.py} calculates central-difference gradient slope, aspect, and Topographic Wetness Index.\\
@@ -159,11 +161,12 @@ The platform is designed as an integrated, three-tier geospatial system connecti
     \draw[biarr] (frontend.south) -- node[flowlabel] {HTTP REST Requests (multipart KML) $\longleftrightarrow$ GeoJSON FeatureCollections} (gateway.north);
     \draw[biarr] (gateway.south) -- node[flowlabel] {Asynchronous Threadpool Tasks $\longleftrightarrow$ Numerical Elevation Grids \& Polygons} (backend.north);
 
-  \end{tikzpicture}
+  \end{tikzpicture}%
+  }
   \caption{System architecture showing the clear three-tier separation: (1) Frontend Web GIS Presentation Tier, (2) Network Bridge and FastAPI Gateway, and (3) Backend Hydrological Analytical Engine, along with bidirectional data contracts.}
   \label{fig:architecture}
   \Description{Three-tier architecture diagram showing the Web GIS frontend, FastAPI network gateway, and hydrological backend engine.}
-\end{figure*}
+\end{figure}
 
 \subsection{Technology Stack}
 \begin{itemize}
