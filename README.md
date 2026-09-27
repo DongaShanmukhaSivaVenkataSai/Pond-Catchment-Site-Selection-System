@@ -1,4 +1,4 @@
-# AI-based Village Pond Planning System
+# Village Pond Planning System
 ### Automated Hydrological Modeling, Catchment Delineation, and Runoff Estimation for Rural Rainwater Harvesting
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
@@ -22,7 +22,7 @@
 
 In semi-arid rural regions across India, over 60% of agricultural cultivation depends entirely on erratic monsoon rains. Farm ponds and check dams provide decentralized rainwater harvesting (RWH) infrastructure to recharge groundwater aquifers and support protective irrigation during critical dry spells. However, conventional manual site surveys frequently fail because ponds are positioned in topographic saddles with insufficient contributing catchment or on steep slopes prone to rapid siltation.
 
-The **AI-based Village Pond Planning System** is an end-to-end, automated, web-based geospatial decision-support platform. It takes raw elevation contours exported from Google Earth (KML format), builds a metric 1-meter Digital Elevation Model (DEM), models gravity flow routing, traces upstream watershed basins in sub-millisecond time, and scores optimal pond sites using multi-criteria hydromorphology—all delivered in an interactive, zero-install Web GIS interface.
+The **Village Pond Planning System** is an end-to-end, automated, web-based geospatial decision-support platform. It takes raw elevation contours exported from Google Earth (KML format), builds a metric 1-meter Digital Elevation Model (DEM), models gravity flow routing, traces upstream watershed basins in sub-millisecond time, and scores optimal pond sites using multi-criteria hydromorphology—all delivered in an interactive, zero-install Web GIS interface.
 
 ---
 
