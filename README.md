@@ -194,12 +194,3 @@ For an evaluated rural watershed in Andhra Pradesh ($139.16\,\text{ha}$, elevati
 * **Total Harvestable Inflow Volume ($V$):** $10,803\,\text{m}^3$ ($10.80\,\text{megaliters}$)
 * **Recommended Reservoir Dimensions:** $40\,\text{m} \times 35\,\text{m} \times 2.8\,\text{m}$ (Capacity: $3,920\,\text{m}^3$ storing $\approx 36\%$ of seasonal inflow with spillway bypass).
 
----
-
-## 📜 Course & Academic Attribution
-
-This project was developed for **CSD Assignment 1 (Computer System Design)** at the **Indian Institute of Information Technology, Sri City (IIIT Sri City)**.
-
-* **Author:** Donga Shanmukha Siva Venkata Sai
-* **Roll No / Email:** `shanmukhasivavenkatasai.d22@iiits.in`
-* **Instructor Guidance:** Course Instructors and Teaching Assistants of Computer System Design (CSD).
