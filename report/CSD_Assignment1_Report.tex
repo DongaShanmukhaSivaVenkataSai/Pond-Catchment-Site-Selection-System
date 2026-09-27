@@ -1,6 +1,6 @@
 %%
-%% CSD Assignment 1 - Final Technical Report Template
-%% Based on the ACM "acmart" manuscript (single-column) style.
+%% CSD Assignment 1 - Final Technical Report
+%% ACM "acmart" manuscript style (compacted for <= 10 pages)
 %%
 \documentclass[manuscript,screen,review]{acmart}
 
@@ -9,17 +9,15 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+
+% Compact float and list spacing for <= 10 pages target
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}}
-
-%% ------------------------------------------------------------------
-%% Course Assignment Header
-%% ------------------------------------------------------------------
-% \setcopyright{acmlicensed}
-% \acmConference[CSD Assignment 1]{Course: Computer System Design}{2026}{Hyderabad, India}
-% \acmISBN{}
 
 \begin{document}
 
@@ -38,7 +36,7 @@
 
 %% =================== ABSTRACT ======================================
 \begin{abstract}
-Rural rainwater harvesting is vital for sustaining groundwater aquifers and supporting rainfed agriculture in semi-arid developing regions. However, optimal farm-pond site selection is traditionally hindered by expensive manual topographic surveys, subjective field heuristics, and inaccessible desktop GIS software. In this work, we present the \emph{AI-based Village Pond Planning System}, an automated, end-to-end hydrological modeling and multi-criteria decision framework integrated into a zero-install Web GIS application. Given high-resolution elevation contours in KML or GeoJSON formats, the system automatically projects geographic coordinates into local Universal Transverse Mercator (UTM Zone 44N) metrics, interpolates a continuous Digital Elevation Model (DEM) via 2D Delaunay-based bivariate triangulation, and computes essential surface derivatives including terrain gradient and the Topographic Wetness Index (TWI). Using a vectorized D8 steepest-descent flow-routing algorithm and an inverted Compressed Sparse Row (CSR) graph traversal engine, the backend delivers sub-millisecond recursive upstream watershed delineation for any user-selected pour point. Potential pond locations are ranked through Multi-Criteria Evaluation (MCE) incorporating flow accumulation, terrain depression depth, slope constraints, and spatial non-maximum suppression. The expected harvestable runoff volume is computed using the empirical Rational Method ($V = C \times P \times A$). Built with a decoupled FastAPI ASGI backend and an interactive Leaflet frontend featuring real-time land-parcel drawing and dynamic hydrology visualization, the platform achieves end-to-end pipeline execution in approximately $1.15\,\text{s}$ over a $55,000$-cell terrain grid. A real-world case study in Andhra Pradesh demonstrates the identification of an optimal $3,750\,\text{m}^3$ pond site served by a $3.245\,\text{ha}$ catchment yielding $10.79\,\text{ML}$ in annual harvestable runoff.
+Rural rainwater harvesting is vital for sustaining groundwater aquifers and rainfed agriculture in semi-arid regions. However, optimal farm-pond siting is impeded by expensive manual surveys, subjective field heuristics, and inaccessible desktop GIS software. In this work, we present the \emph{AI-based Village Pond Planning System}, an automated geospatial hydrology and decision-support framework integrated into a zero-install Web GIS application. Given contour vectors in KML or GeoJSON formats, the system reprojects coordinates to local Universal Transverse Mercator (UTM Zone 44N) metrics, interpolates a continuous Digital Elevation Model (DEM) via 2D Delaunay-based bivariate triangulation, and derives key terrain properties including slope and the Topographic Wetness Index (TWI). Hydrological flow is modeled using a vectorized D8 steepest-descent algorithm coupled with an inverted Compressed Sparse Row (CSR) graph traversal engine, delivering sub-millisecond ($<1\,\text{ms}$) recursive upstream watershed delineation for any user-selected pour point. Candidate pond sites are prioritized through Multi-Criteria Evaluation (MCE) combining flow accumulation, topographic depressions, slope thresholds, and spatial non-maximum suppression. Harvestable runoff volume is estimated via the empirical Rational Method ($V = C \times P \times A$). Built with a decoupled FastAPI ASGI backend and an interactive Leaflet frontend featuring real-time land-parcel drawing and dynamic hydrology visualization, the platform executes the end-to-end pipeline in $1.15\,\text{s}$ over a $55,000$-cell terrain grid. A real-world case study in Andhra Pradesh demonstrates the identification of an optimal $3,750\,\text{m}^3$ pond site served by a $3.245\,\text{ha}$ catchment yielding $10.79\,\text{ML}$ in annual runoff.
 \end{abstract}
 
 \keywords{Village Pond Planning, Geospatial Hydrology, Rainwater Harvesting, D8 Flow Routing, Catchment Delineation, Multi-Criteria Evaluation, Web GIS, REST APIs}
@@ -48,51 +46,30 @@ Rural rainwater harvesting is vital for sustaining groundwater aquifers and supp
 %% =====================================================================
 \section{Introduction}
 \label{sec:intro}
-Water scarcity poses an existential threat to agrarian livelihoods across semi-arid regions of India, where over $60\%$ of cultivated land depends entirely on erratic monsoon precipitation. Farm ponds, percolation tanks, and check dams constitute the primary decentralized infrastructure for rainwater harvesting (RWH), capturing surplus surface runoff during high-intensity rainfall events to recharge depleting shallow aquifers and supply supplemental protective irrigation~\cite{critchley1991water}. Despite widespread governmental initiatives, a significant proportion of constructed rural ponds fail to achieve their anticipated storage capacity or dry up prematurely due to suboptimal spatial placement---either situated in micro-topographic divides with insufficient upstream catchment area, placed on steep slopes prone to severe siltation and embankment failure, or located far from usable agricultural plots.
+Water scarcity severely constrains agricultural productivity across semi-arid regions of India, where over $60\%$ of cultivated land depends entirely on erratic monsoon rains. Farm ponds, percolation tanks, and check dams provide decentralized rainwater harvesting (RWH) infrastructure to recharge shallow aquifers and supply protective irrigation~\cite{critchley1991water}. However, many rural ponds fail or dry up prematurely due to poor spatial siting---frequently positioned in topographic saddles with deficient catchment areas or on steep slopes prone to severe siltation. 
 
-The fundamental objective of this project is to develop an automated, intelligent, and web-accessible geospatial decision-support system that empowers village panchayats, watershed development committees, and agricultural extension officers to scientifically plan, evaluate, and locate rainwater harvesting ponds. By bridging complex terrain analysis with an accessible browser interface, the system eliminates reliance on expensive proprietary GIS software while enforcing rigorous hydrological physics.
-
-The remainder of this report is organized as follows: Section~\ref{sec:requirements} articulates the functional and non-functional requirements. Section~\ref{sec:architecture} presents the multi-tier system architecture and technology choices. Section~\ref{sec:methodology} provides the mathematical and algorithmic methodology for DEM generation, D8 flow accumulation, catchment delineation, and runoff modeling. Section~\ref{sec:implementation} details the backend REST API and Leaflet frontend implementation. Section~\ref{sec:csd-themes} explicitly maps core Computer System Design (CSD) concepts to our engineering decisions. Section~\ref{sec:results} presents quantitative empirical results and performance benchmarks from a real-world case study. Section~\ref{sec:discussion} discusses limitations and future research, and Section~\ref{sec:ai-usage} provides the mandatory AI usage declaration.
+This project develops an automated, web-accessible geospatial decision system that empowers village planners and agricultural officers to scientifically identify, evaluate, and locate rainwater harvesting ponds without requiring specialized GIS expertise.
 
 \subsection{Motivation}
-Traditional site-selection methods rely on physical theodolite and total-station field surveys or coarse satellite data. Manual topographic surveys are labor-intensive, logistically cumbersome, and economically prohibitive for village-level planning. Conversely, free global digital elevation models (such as SRTM 30m or ASTER GDEM) possess spatial resolutions far too coarse to resolve the micro-topographical swales and farm-bund depressions that dictate field-scale runoff routing. While high-resolution elevation contours from unmanned aerial vehicles (UAVs) or local cadastral surveys are increasingly available, field engineers lack the specialized computational tools to convert these contour polylines into hydrological stream networks and contributing drainage basins without complex desktop GIS packages (e.g., ArcGIS, QGIS). 
-
-Furthermore, existing tools operate as disjointed pipelines: terrain interpolation is performed in one software, watershed delineation in another, and runoff calculations in spreadsheets. This fragmentation prevents village planners from interactively assessing the hydrological impact of selecting specific land parcels. An automated Web GIS platform that bridges contour parsing, DEM interpolation, D8 flow routing, and Rational runoff estimation into a unified, interactive workflow provides an urgent and transformative solution.
+Manual theodolite and total-station field surveys are labor-intensive, slow, and cost-prohibitive for gram panchayats. Open-access satellite DEMs (e.g., SRTM 30m) are too coarse to resolve the meter-scale swales and field bunds that control agricultural runoff. While high-resolution elevation contours from UAV or cadastral surveys exist, field engineers lack automated tools to transform contour polylines into stream networks and catchment basins without complex desktop GIS packages (ArcGIS, QGIS). Our browser-based platform eliminates this bottleneck by unifying contour ingestion, DEM interpolation, D8 flow routing, and runoff estimation into a responsive, zero-install Web GIS application.
 
 \subsection{Scope of the Project}
-The system specifically addresses field-scale hydrological assessment and site suitability ranking.
-\begin{itemize}
-    \item \textbf{In-Scope Capabilities:}
-    \begin{enumerate}
-        \item Automated ingestion and spatial parsing of KML, KMZ, and GeoJSON contour vector datasets.
-        \item Geodetic coordinate transformation from WGS84 (EPSG:4326) to conformal Universal Transverse Mercator (UTM Zone 44N, EPSG:32644) metric coordinates.
-        \item High-fidelity continuous DEM grid rasterization using Delaunay-based bivariate linear interpolation with nearest-neighbor convex-hull boundary padding.
-        \item Calculation of first- and second-order topographic derivatives (slope, aspect, curvature, and Topographic Wetness Index).
-        \item Vectorized D8 single-direction flow routing, depression pit handling, and continuous flow accumulation mapping.
-        \item Multi-Criteria Evaluation (MCE) incorporating flow accumulation, terrain depression depth, and slope thresholds with spatial Non-Maximum Suppression (NMS) to propose top candidate pond sites.
-        \item Sub-millisecond recursive upstream watershed delineation from any user-selected pour point or custom clicked coordinate using an inverted Compressed Sparse Row (CSR) graph structure.
-        \item Estimation of annual harvestable runoff volume and optimal pond capacity using the Rational runoff equation parameterized by soil permeability and historical rainfall.
-        \item An interactive, zero-install Leaflet Web GIS frontend supporting spatial polygon drawing for land parcel bounding, layer toggles, and live metric updates.
-    \end{enumerate}
-    \item \textbf{Out-of-Scope Elements:}
-    \begin{enumerate}
-        \item Sub-surface geotechnical bore-hole lithology, infiltration permeability testing, and structural civil design of masonry spillways or earthen embankment cross-sections.
-        \item Long-term sediment transport modeling and dynamic hydraulic flood-wave routing using the St. Venant equations.
-        \item Real-time legal land-titling dispute resolution and cadastral ownership verification.
-    \end{enumerate}
-\end{itemize}
+\textbf{In-Scope:} (1) Automated parsing of KML, KMZ, and GeoJSON contour vectors; (2) Conformal UTM metric coordinate reprojection; (3) 2D Delaunay-based DEM grid rasterization; (4) Terrain derivatives (slope, aspect, TWI); (5) Vectorized D8 flow routing and continuous flow accumulation; (6) MCE site selection with spatial Non-Maximum Suppression (NMS); (7) Sub-millisecond recursive upstream watershed delineation via inverted CSR graphs; (8) Rational Method runoff estimation ($V = C \cdot P \cdot A$); and (9) An interactive Leaflet Web GIS supporting user land-boundary polygon drawing and real-time metric updates.
+
+\textbf{Out-of-Scope:} Sub-surface borehole lithological testing, structural civil design of masonry spillways or earthen bunds, dynamic hydrodynamic flood wave routing, and legal cadastral land-title dispute arbitration.
 
 %% =====================================================================
 \section{Problem Statement and Requirements}
 \label{sec:requirements}
-The problem addressed in this work is: \emph{Given a set of elevation contour polylines and user-defined land boundary constraints for a rural watershed, automatically identify the topographically optimal farm-pond locations, delineate their exact contributing catchment areas, and compute the harvestable water volume based on local precipitation and soil characteristics.}
+\textbf{Problem Statement:} \emph{Given elevation contour polylines and user-defined boundary constraints for a rural watershed, automatically identify optimal pond sites, delineate their contributing catchment areas, and compute harvestable runoff volume based on local precipitation and soil characteristics.}
 
-Table~\ref{tab:requirements} maps each functional requirement specified in the project brief to the corresponding implementation module in the repository.
+Table~\ref{tab:requirements} maps each functional requirement to its implementation module.
 
 \begin{table}[h]
-  \caption{Functional requirements and where they are implemented}
+  \small
+  \caption{Mapping of functional requirements to implementation modules}
   \label{tab:requirements}
-  \begin{tabular}{p{5.2cm}p{7.2cm}}
+  \begin{tabular}{lp{8.0cm}}
     \toprule
     Requirement & Implemented in Module / File \\
     \midrule
@@ -109,389 +86,260 @@ Table~\ref{tab:requirements} maps each functional requirement specified in the p
 \end{table}
 
 \subsection{Non-Functional Requirements}
-To ensure practical adoption by rural agricultural engineers and field officers operating under constrained network conditions, the following non-functional requirements were established:
 \begin{enumerate}
-    \item \textbf{Performance and Latency:} Processing a 1-meter resolution contour dataset ($>50,000$ points) from raw KML to full hydrological candidate extraction must complete within $2.0\,\text{seconds}$. Dynamic on-the-fly catchment delineation for user-clicked points must execute in $<100\,\text{ms}$ to deliver fluid interactivity.
-    \item \textbf{Asynchronous Non-Blocking Concurrency:} The backend must execute CPU-bound matrix operations (e.g., SciPy Delaunay triangulation and flow accumulation) outside the main event loop using worker thread pools, ensuring that concurrent client requests are never blocked.
-    \item \textbf{Usability and Lightweight Footprint:} The client interface must run directly in standard mobile and desktop web browsers without external plugins, heavyweight JavaScript frameworks (such as React or Angular), or local Python/GIS dependencies. The total client bundle size is kept under $1.5\,\text{MB}$.
-    \item \textbf{Stateless Scalability:} The API architecture must remain strictly stateless, passing data through well-defined Pydantic GeoJSON schemas to permit horizontal scaling behind reverse proxies without session synchronization overhead.
-    \item \textbf{Robust Resilience and Boundary Safety:} The spatial delineator must gracefully handle boundary edge cases, flat sink depressions, and inverted flow loops without infinite recursion or unhandled exceptions.
+    \item \textbf{Performance:} Complete end-to-end pipeline execution on $50,000+$ contour points in $<2.0\,\text{s}$. On-the-fly catchment queries must execute in $<100\,\text{ms}$ for fluid map interaction.
+    \item \textbf{Concurrency:} Dispatches CPU-bound numerical matrix operations to background thread pools via \texttt{run\_in\_executor}, preventing ASGI event loop starvation.
+    \item \textbf{Usability:} Lightweight, zero-install Web GIS running in modern browsers with a total client bundle footprint $<1.5\,\text{MB}$ without heavy dependencies (e.g., React).
+    \item \textbf{Resilience:} Stateless RESTful API with robust exception handling for boundary edge cases, concave geometries, and zero-slope sink depressions.
 \end{enumerate}
 
 %% =====================================================================
 \section{System Architecture and High-Level Design}
 \label{sec:architecture}
-The system is architected as a decoupled, multi-tier client-server application. Figure~\ref{fig:architecture} illustrates the end-to-end data flow across the presentation, application, and geospatial computation layers.
+The platform is designed as a decoupled, multi-tier architecture spanning presentation, gateway, analytical processing, and hydrological decision layers. Figure~\ref{fig:architecture} presents the hierarchical tree-structured architecture design of the system.
 
-\begin{figure*}[t]
+\begin{figure}[h]
   \centering
+  \resizebox{\linewidth}{!}{%
   \begin{tikzpicture}[
-    node distance=1.4cm and 1.8cm,
-    font=\small\sffamily,
-    box/.style={draw=black!70, rounded corners=4pt, line width=0.8pt, fill=blue!5, align=center, inner sep=7pt},
-    client/.style={box, fill=teal!10, draw=teal!80},
-    gateway/.style={box, fill=orange!10, draw=orange!80},
-    compute/.style={box, fill=purple!10, draw=purple!80},
-    data/.style={box, fill=gray!10, draw=gray!80},
-    arrow/.style={-{Stealth[length=2.5mm]}, line width=1pt, draw=black!75}
+    font=\sffamily\footnotesize,
+    node distance=7mm and 5mm,
+    root/.style={draw=teal!85, fill=teal!15, rounded corners=4pt, line width=1pt, align=center, font=\bfseries\small, inner sep=6pt},
+    tier/.style={draw=blue!75, fill=blue!10, rounded corners=3pt, line width=0.8pt, align=center, font=\bfseries\footnotesize, inner sep=4pt, text width=3.4cm},
+    leaf/.style={draw=gray!65, fill=gray!5, rounded corners=2pt, align=left, font=\scriptsize, inner sep=3.5pt, text width=3.4cm},
+    conn/.style={-{Stealth[length=2.2mm]}, draw=black!75, line width=0.8pt}
   ]
-    % Client Tier
-    \node[client] (ui) {\textbf{Presentation Tier (Web GIS)}\\Leaflet.js 1.9.4 + Leaflet.Draw\\Interactive Dark/Satellite Canvas\\Land Boundary Selection \& HUD};
+    % Root
+    \node[root] (sys) {AI-based Village Pond Planning System Architecture};
 
-    % Gateway Tier
-    \node[gateway, right=of ui] (api) {\textbf{Application Tier (FastAPI)}\\ASGI Server (Uvicorn)\\CORS Middleware \& Static Mount\\Pydantic Validation \& Async Dispatch};
+    % Tier nodes
+    \node[tier, below left=10mm and 22mm of sys] (ui) {Presentation Tier\\(Leaflet Web GIS)};
+    \node[tier, below left=10mm and -17mm of sys] (api) {Application Gateway\\(FastAPI ASGI)};
+    \node[tier, below right=10mm and -17mm of sys] (engine) {Hydrology Engine\\(NumPy / SciPy)};
+    \node[tier, below right=10mm and 22mm of sys] (hydro) {Decision \& Sizing\\(MCE \& Rational)};
 
-    % Compute Tier
-    \node[compute, right=of api] (engine) {\textbf{Geospatial Hydrology Engine}\\PyProj (WGS84 $\to$ UTM Zone 44N)\\SciPy \texttt{griddata} (DEM Rasterization)\\NumPy D8 Flow Routing \& Slope/TWI\\Inverted CSR Graph Catchment Engine};
+    % Connect root to tiers
+    \draw[conn] (sys.south) -| (ui.north);
+    \draw[conn] (sys.south) -| (api.north);
+    \draw[conn] (sys.south) -| (engine.north);
+    \draw[conn] (sys.south) -| (hydro.north);
 
-    % Data Tier
-    \node[data, below=of engine] (storage) {\textbf{Data \& Output Layer}\\KML/KMZ Elevation Contours\\GeoJSON Stream Network \& Catchments\\Rational Hydrological Calculations\\CSV / GeoPackage Export};
+    % Leaves under UI
+    \node[leaf, below=3mm of ui] (ui1) {$\bullet$ Leaflet 1.9.4 Map Canvas\\$\bullet$ CARTO \& Esri Basemaps\\$\bullet$ Leaflet.Draw Land Selection\\$\bullet$ Turf.js Spatial Bounding\\$\bullet$ Real-time Hydrology HUD};
 
-    % Connections
-    \draw[arrow] (ui) -- node[above] {\scriptsize HTTP/REST} node[below] {\scriptsize Multi-part KML} (api);
-    \draw[arrow] (api) -- node[above] {\scriptsize \texttt{run\_in\_executor}} node[below] {\scriptsize CPU Threadpool} (engine);
-    \draw[arrow] (engine) -- node[right] {\scriptsize Matrices \& Polygons} (storage);
-    \draw[arrow] (storage) -| node[above, near start] {\scriptsize GeoJSON Payloads} (api);
-    \draw[arrow] (api.south) -- ++(0,-0.6) -| node[above, near end] {\scriptsize Overlays, Markers \& Metrics} (ui.south);
+    % Leaves under API
+    \node[leaf, below=3mm of api] (api1) {$\bullet$ Uvicorn Async Server\\$\bullet$ Pydantic Schema Validation\\$\bullet$ ThreadPoolExecutor Workers\\$\bullet$ In-Memory Grid Caching\\$\bullet$ Unified Static File Mount};
 
-  \end{tikzpicture}
-  \caption{High-level system architecture illustrating the decoupled presentation, application, and geospatial computation tiers.}
+    % Leaves under Engine
+    \node[leaf, below=3mm of engine] (eng1) {$\bullet$ PyProj WGS84 $\to$ UTM 44N\\$\bullet$ SciPy Delaunay DEM Raster\\$\bullet$ 2D Central-Diff Slope/TWI\\$\bullet$ Vectorized D8 Flow Routing\\$\bullet$ Inverted CSR Graph BFS};
+
+    % Leaves under Hydro
+    \node[leaf, below=3mm of hydro] (hyd1) {$\bullet$ MCE Topographic Siting\\$\bullet$ Spatial Non-Max Suppression\\$\bullet$ Rational Runoff: $V = C P A$\\$\bullet$ Inflow-to-Storage Sizing\\$\bullet$ GeoJSON / CSV Exporter};
+
+    % Connect tiers to leaves
+    \draw[conn] (ui) -- (ui1);
+    \draw[conn] (api) -- (api1);
+    \draw[conn] (engine) -- (eng1);
+    \draw[conn] (hydro) -- (hyd1);
+
+  \end{tikzpicture}%
+  }
+  \caption{Tree-structured system architecture showing hierarchical decomposition from system root into presentation, gateway, analytical engine, and decision tiers.}
   \label{fig:architecture}
-  \Description{System architecture flowchart demonstrating interaction between Leaflet Web GIS client, FastAPI ASGI backend, and NumPy/SciPy hydrological computation engine.}
-\end{figure*}
-
-The presentation tier is hosted on the same port-forwarded HTTP domain via FastAPI's static file mount. When a user uploads a contour file or initiates an analysis:
-\begin{enumerate}
-    \item The client transmits the contour dataset and boundary bounding parameters to the backend REST endpoint (\texttt{/api/v1/analyze}).
-    \item The application tier validates the payload, unmarshals the coordinate geometries, and delegates computation to a worker thread via \texttt{asyncio.get\_event\_loop().run\_in\_executor()}.
-    \item The analytical engine transforms the coordinates, rasterizes the elevation mesh, executes 2D central-difference slope analysis, routes the flow field using vectorized D8 kernels, scores candidates with MCE, and extracts watershed boundaries.
-    \item The computed features are serialized into standards-compliant GeoJSON FeatureCollections and returned to the client for hardware-accelerated vector rendering on the Leaflet canvas.
-\end{enumerate}
+  \Description{Hierarchical tree diagram showing system tiers and modular components.}
+\end{figure}
 
 \subsection{Technology Stack}
-The technical stack was deliberately selected to balance computational performance with deployment simplicity:
 \begin{itemize}
-    \item \textbf{Backend Web Framework:} \emph{FastAPI (Python 3.10+)}~\cite{fastapi2018} running on the \emph{Uvicorn ASGI} server. FastAPI was chosen over Flask and Django due to its asynchronous coroutine support, native validation via Pydantic type annotations, automatic OpenAPI (Swagger) documentation generation, and superior JSON serialization throughput.
-    \item \textbf{Scientific \& Geospatial Computation:} 
-    \begin{itemize}
-        \item \emph{NumPy:} Array vectorization for sliding-window D8 neighbor comparisons and fast matrix slicing.
-        \item \emph{SciPy (\texttt{scipy.interpolate.griddata}):} Bivariate linear Delaunay interpolation for converting irregular contour polylines into uniform raster elevation grids.
-        \item \emph{PyProj:} Coordinate reference system transformations, rigorously projecting geodetic angular coordinates (EPSG:4326) to conformal metric cartesian coordinates (EPSG:32644) to ensure accurate area and slope measurements.
-        \item \emph{Shapely:} 2D spatial planar operations, including polygon topological union (\texttt{unary\_union}), convex-hull generation, and Douglas-Peucker geometric simplification.
-    \end{itemize}
-    \item \textbf{Frontend GIS Stack:} \emph{Vanilla JavaScript (ES6+), HTML5, and CSS3} paired with \emph{Leaflet 1.9.4}~\cite{leaflet2010}. Modern heavy single-page application (SPA) frameworks (e.g., React, Vue) were explicitly avoided to ensure zero compilation overhead, immediate browser evaluation, and minimal bundle footprint. Spatial polygon drawing is provided by \emph{Leaflet.Draw}, and client-side bounding intersection is performed via \emph{Turf.js}.
-    \item \textbf{Cartographic Basemaps:} \emph{CARTO Dark Matter} (authenticated via authorized API keys) for high-contrast thematic visualization of contours and streams, complemented by \emph{Esri World Imagery} satellite tiles for real-world ground-truth verification.
+    \item \textbf{Backend:} \emph{FastAPI (Python 3.10+)}~\cite{fastapi2018} on the \emph{Uvicorn ASGI} server. Provides native asynchronous coroutines, high-throughput JSON serialization, and automatic OpenAPI schema generation.
+    \item \textbf{Scientific \& Spatial Libraries:} \emph{NumPy} for vectorized array kernels; \emph{SciPy} (\texttt{griddata}) for 2D Delaunay DEM interpolation; \emph{PyProj} for EPSG:4326 to EPSG:32644 metric projection; and \emph{Shapely} for topological polygon unions and vector geometry serialization.
+    \item \textbf{Frontend:} \emph{Vanilla JavaScript (ES6+), HTML5, CSS3}, and \emph{Leaflet 1.9.4}~\cite{leaflet2010} with \emph{Leaflet.Draw} and \emph{Turf.js}. Avoids heavy JavaScript framework bloat to deliver sub-second initial browser loading.
+    \item \textbf{Basemaps:} Authenticated \emph{CARTO Dark Matter} for high-contrast thematic vector visibility, paired with \emph{Esri World Imagery} satellite tiles.
 \end{itemize}
 
 %% =====================================================================
 \section{Methodology}
 \label{sec:methodology}
-This section details the mathematical and algorithmic pipeline underpinning the terrain and catchment analysis.
 
 \subsection{Terrain and Elevation Analysis}
-Raw contour data is ingested as a set of polylines $\mathcal{L} = \{L_1, L_2, \dots, L_k\}$, where each polyline $L_i$ consists of ordered longitude-latitude pairs $(\lambda_j, \phi_j)$ associated with an elevation attribute $z_i \in \mathbb{R}$.
-
-\subsubsection{Coordinate Transformation}
-Because angular degrees cannot be directly used for slope or volumetric calculations without substantial latitudinal distortion, coordinates are reprojected to the local UTM metric grid using the transverse Mercator projection implemented in PyProj:
+Raw contour polylines $\mathcal{L} = \{L_i\}_{i=1}^k$ with elevation attributes $z_i$ are reprojected from geodetic coordinates $(\lambda, \phi)$ to conformal metric UTM Zone 44N coordinates:
 \begin{equation}
     (x_j, y_j) = \mathcal{T}_{\text{EPSG:4326} \to \text{EPSG:32644}}(\lambda_j, \phi_j)
 \end{equation}
-
-\subsubsection{Continuous DEM Interpolation}
-From the projected contour vertices, a 3D point cloud $\mathcal{P} = \{(x_m, y_m, z_m)\}_{m=1}^N$ is constructed. A regular two-dimensional grid is defined over the bounding box:
-\begin{equation}
-    x_c \in [x_{\min}, x_{\max}] \quad \text{with step } \Delta x = \delta
-\end{equation}
-\begin{equation}
-    y_r \in [y_{\min}, y_{\max}] \quad \text{with step } \Delta y = \delta
-\end{equation}
-where $\delta$ is the user-specified grid resolution (typically $\delta = 1.0\,\text{meter}$). The elevation at each grid node $(x_c, y_r)$ is determined using 2D piecewise linear barycentric interpolation across the Delaunay triangulation of $\mathcal{P}$. For grid nodes situated outside the convex hull of the input contours (which produce $\text{NaN}$ values under linear interpolation), nearest-neighbor extrapolation is applied:
+A 3D point cloud $\mathcal{P} = \{(x_m, y_m, z_m)\}$ is rasterized onto a uniform 2D grid ($x_c \in [x_{\min}, x_{\max}]$, $y_r \in [y_{\min}, y_{\max}]$) with resolution $\delta = 1.0\,\text{m}$. Elevations are derived via 2D piecewise linear barycentric interpolation across the Delaunay triangulation of $\mathcal{P}$, with nearest-neighbor padding outside the convex hull:
 \begin{equation}
     \text{DEM}(r, c) = \begin{cases}
         z_{\text{linear}}(x_c, y_r), & \text{if } (x_c, y_r) \in \text{Conv}(\mathcal{P}) \\
         z_{\text{nearest}}(x_c, y_r), & \text{otherwise}
     \end{cases}
 \end{equation}
-
-\subsubsection{Topographic Slope and Curvature}
-Surface gradients are computed using second-order central finite differences across the DEM matrix:
+Terrain slope $\theta(r, c)$ in degrees is derived using central finite differences:
 \begin{equation}
-    p = \frac{\partial z}{\partial x} \approx \frac{\text{DEM}(r, c+1) - \text{DEM}(r, c-1)}{2\delta}
+    p = \frac{\text{DEM}(r, c+1) - \text{DEM}(r, c-1)}{2\delta}, \quad
+    q = \frac{\text{DEM}(r+1, c) - \text{DEM}(r-1, c)}{2\delta}
 \end{equation}
-\begin{equation}
-    q = \frac{\partial z}{\partial y} \approx \frac{\text{DEM}(r+1, c) - \text{DEM}(r-1, c)}{2\delta}
-\end{equation}
-The local topographic slope angle $\theta$ (in degrees) is given by:
 \begin{equation}
     \theta(r, c) = \arctan\left(\sqrt{p^2 + q^2}\right) \times \frac{180}{\pi}
 \end{equation}
-The Topographic Wetness Index (TWI), originally formulated by Beven and Kirkby~\cite{beven1979physically} to characterize steady-state wetness and saturation tendencies, is derived as:
+The Topographic Wetness Index (TWI)~\cite{beven1979physically} characterizes moisture accumulation tendencies:
 \begin{equation}
-    \text{TWI}(r, c) = \ln\left( \frac{\alpha}{\tan \beta + \epsilon} \right)
+    \text{TWI}(r, c) = \ln\left( \frac{\alpha}{\tan(\theta \cdot \frac{\pi}{180}) + 10^{-5}} \right)
 \end{equation}
-where $\alpha$ is the specific upslope contributing area per unit contour width, $\beta = \theta \times \frac{\pi}{180}$ is the slope angle in radians, and $\epsilon = 10^{-5}$ prevents division by zero in flat depressions.
+where $\alpha$ is the specific upslope contributing area per unit contour width.
 
 \subsection{Catchment Area Delineation}
-Hydrological flow routing is modeled using the discrete D8 (Deterministic Eight-Node) single-flow-direction algorithm~\cite{tarboton1991new}.
-
-\subsubsection{D8 Flow Direction}
-For each internal cell $(r, c)$ in the DEM, the flow direction is routed to the single neighbor among the 8 Moore neighborhood cells that presents the steepest downward gradient:
+Hydrological flow routing utilizes the discrete D8 single-flow-direction algorithm~\cite{tarboton1991new}, directing runoff from cell $(r, c)$ to the steepest downhill neighbor among the 8 Moore adjacent cells:
 \begin{equation}
     k^* = \arg\max_{k \in \{0, \dots, 7\}} \frac{\text{DEM}(r, c) - \text{DEM}(r + \Delta r_k, c + \Delta c_k)}{d_k}
 \end{equation}
-where $\Delta r_k, \Delta c_k \in \{-1, 0, 1\}$ represent the row and column spatial offsets corresponding to compass directions $\{\text{NW}, \text{N}, \text{NE}, \text{W}, \text{E}, \text{SW}, \text{S}, \text{SE}\}$, and $d_k$ is the metric distance:
-\begin{equation}
-    d_k = \begin{cases}
-        \delta, & \text{for orthogonal neighbors } (k \in \{1, 3, 4, 6\}) \\
-        \delta \sqrt{2}, & \text{for diagonal neighbors } (k \in \{0, 2, 5, 7\})
-    \end{cases}
-\end{equation}
-Cells possessing no neighbor with lower elevation are designated as sinks/pits ($-1$) and handled through flat-area flow-routing heuristics.
+where $d_k = \delta$ for orthogonal neighbors and $d_k = \delta \sqrt{2}$ for diagonal neighbors.
 
-\subsubsection{Inverted CSR Graph Traversal}
-Traditional catchment extraction loops over all grid cells and traces downstream paths, requiring $O(M \cdot H)$ operations, where $M$ is the grid size and $H$ is average flow length. In our implementation, we construct an inverted flow adjacency graph (\texttt{UpstreamGraph}) during initialization. By flattening the 2D grid into a 1D index array of size $M = \text{rows} \times \text{cols}$, we record for every target cell $u$ the exact list of tributary source cells $\{v : \text{flow}(v) = u\}$. 
-
-Using a Compressed Sparse Row (CSR) offset and count structure stored in contiguous flat NumPy arrays, delineating the upstream watershed of any candidate cell $c_{\text{pour}}$ requires only a single Breadth-First Search (BFS) starting at $c_{\text{pour}}$:
+To achieve real-time catchment queries, we construct an inverted flow adjacency graph (\texttt{UpstreamGraph}) during initialization. Source-target flow links are packed into flattened Compressed Sparse Row (CSR) arrays indexed by cell IDs. Extracting the upstream catchment basin $\mathcal{W}(c_{\text{pour}})$ requires only an elementary Breadth-First Search (BFS) from the pour point:
 \begin{equation}
     \mathcal{W}(c_{\text{pour}}) = \{c_{\text{pour}}\} \cup \bigcup_{v \in \text{upstream}(u)} \mathcal{W}(v)
 \end{equation}
-This achieves sub-millisecond execution ($<1\,\text{ms}$), enabling instant catchment polygon rendering when a user clicks anywhere on the map interface.
+This graph traversal completes in $<1\,\text{ms}$, allowing users to click anywhere on the map and see immediate watershed boundary polygon updates.
 
-\subsubsection{Topographic Siting via Multi-Criteria Evaluation (MCE)}
-Candidate pond locations are determined by evaluating cells that satisfy two fundamental physical constraints: (1) sufficient upstream drainage accumulation ($\text{Acc}(r, c) \ge \tau_{\text{flow}}$), and (2) gentle terrain slope ($\theta(r, c) \le \theta_{\max} = 10^\circ$) to avoid catastrophic dam breach or excessive excavation costs. 
-
-For all eligible cells, a Multi-Criteria Evaluation (MCE) composite suitability score $S(r, c) \in [0, 1]$ is computed:
+\subsection{Pond Siting and Runoff Sizing}
+Cells with sufficient drainage accumulation ($\text{Acc} \ge \tau_{\text{flow}}$) and gentle slopes ($\theta \le 10^\circ$) are evaluated using Multi-Criteria Evaluation (MCE):
 \begin{equation}
-    S(r, c) = w_f \cdot \widehat{\text{Acc}}(r, c) + w_s \cdot (1 - \widehat{\theta}(r, c)) + w_e \cdot (1 - \widehat{z}(r, c))
+    S(r, c) = 0.60 \cdot \widehat{\text{Acc}}(r, c) + 0.30 \cdot (1 - \widehat{\theta}(r, c)) + 0.10 \cdot (1 - \widehat{z}(r, c))
 \end{equation}
-where $\widehat{\text{Acc}}$, $\widehat{\theta}$, and $\widehat{z}$ denote min-max normalized flow accumulation, slope, and elevation, respectively, and the default weight configuration is $w_f = 0.60, w_s = 0.30, w_e = 0.10$. 
+where $\widehat{\text{Acc}}$, $\widehat{\theta}$, and $\widehat{z}$ are min-max normalized values. Spatial Non-Maximum Suppression (NMS) enforces a minimum separation distance $d_{\min} \ge 100\,\text{m}$ between top candidates.
 
-To prevent redundant clustering of pond candidates within the same drainage depression, Spatial Non-Maximum Suppression (NMS) is applied: candidates are greedily selected in descending order of suitability $S$ while enforcing a minimum euclidean separation distance $d_{\min} \ge 100\,\text{meters}$.
-
-\subsection{Rainfall Data Integration and Runoff Modeling}
-The volumetric runoff yield feeding each proposed pond is estimated using the empirical Rational Method~\cite{chow1988applied}:
+Annual harvestable runoff is computed using the empirical Rational Method~\cite{chow1988applied}:
 \begin{equation}
     V_{\text{runoff}} = C \times \left(\frac{P}{1000}\right) \times A_{\text{catchment}}
 \end{equation}
-where:
-\begin{itemize}
-    \item $V_{\text{runoff}}$ is the expected total annual runoff volume in cubic meters ($\text{m}^3$).
-    \item $C \in [0.10, 0.60]$ is the dimensionless runoff coefficient, calibrated to local land use, soil texture, and vegetation cover (e.g., $C = 0.20$ for permeable cultivated sandy loam, $C = 0.35$ for mixed agricultural clay loam, and $C = 0.50$ for degraded rocky scrublands).
-    \item $P$ is the mean annual historical precipitation in millimeters ($\text{mm}$), queried from India Meteorological Department (IMD) gridded data or the Open-Meteo Historical Climate API.
-    \item $A_{\text{catchment}}$ is the planimetric surface area of the delineated contributing watershed in square meters ($\text{m}^2$), computed directly from the polygon geometry using the Shoelace formula on UTM projected vertices.
-\end{itemize}
-The volumetric capacity is also converted to Megaliters ($1\,\text{ML} = 1,000\,\text{m}^3$) for standard irrigation budgeting.
+where $V$ is volume ($\text{m}^3$), $C \in [0.15, 0.50]$ is the runoff coefficient, $P$ is annual rainfall ($\text{mm}$), and $A$ is the catchment area ($\text{m}^2$).
 
 %% =====================================================================
 \section{Implementation}
 \label{sec:implementation}
 
 \subsection{Backend and API Design}
-The backend service is structured modularly under \texttt{backend/app/} with separation between data models (\texttt{schemas.py}), API endpoints (\texttt{routes.py}), and computational domain logic (\texttt{services/}). Table~\ref{tab:endpoints} summarizes the core REST API endpoints exposed by the service.
-
-\begin{table}[h]
-  \caption{Primary REST API endpoints of the Pond Planning System}
-  \label{tab:endpoints}
-  \begin{tabular}{llp{7.2cm}}
-    \toprule
-    HTTP Method & Route & Purpose and Description \\
-    \midrule
-    \texttt{GET} & \texttt{/api/v1/health} & Service health check, memory usage, and operational status. \\
-    \texttt{POST} & \texttt{/api/v1/parse} & Parses uploaded KML/KMZ and returns raw contour features. \\
-    \texttt{POST} & \texttt{/api/v1/dem} & Interpolates DEM grid and returns elevation bounds. \\
-    \texttt{POST} & \texttt{/api/v1/terrain} & Computes slope, aspect, curvature, and TWI matrices. \\
-    \texttt{POST} & \texttt{/api/v1/hydrology} & Generates D8 flow direction and accumulation grids. \\
-    \texttt{POST} & \texttt{/api/v1/streams/geojson} & Extracts vector stream drainage network as GeoJSON. \\
-    \texttt{POST} & \texttt{/api/v1/pond-candidates} & Identifies and ranks top-N pond sites via MCE scoring. \\
-    \texttt{POST} & \texttt{/api/v1/catchment} & Delineates watershed boundary for candidate pond sites. \\
-    \texttt{POST} & \texttt{/api/v1/catchment/custom} & On-the-fly watershed delineation for any user-clicked coordinate. \\
-    \texttt{POST} & \texttt{/api/v1/export/csv} & Exports candidate metrics, area, and volume to CSV. \\
-    \texttt{POST} & \texttt{/api/v1/analyze} & Full end-to-end pipeline: KML $\to$ DEM $\to$ MCE $\to$ GeoJSON. \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Every incoming request is validated against strict Pydantic schemas. To maintain responsiveness, long-running spatial algorithms are dispatched to an internal thread pool executor:
-\begin{verbatim}
-result = await asyncio.get_event_loop().run_in_executor(
-    None, execute_full_pipeline, kml_bytes, resolution, ...
-)
-\end{verbatim}
-This design ensures that HTTP client connections never experience timeout degradation during computationally intensive raster interpolation.
+The service exposes clean RESTful endpoints validated with Pydantic schemas:
+(1) \texttt{POST /api/v1/analyze}: Full pipeline execution returning GeoJSON streams, pond candidates, and catchments;
+(2) \texttt{POST /api/v1/catchment/custom}: On-the-fly sub-millisecond watershed extraction for user-clicked coordinates;
+(3) \texttt{POST /api/v1/dem}: Direct DEM raster matrix generation; and
+(4) \texttt{POST /api/v1/export/csv}: Tabular CSV export of candidate metrics.
+CPU-bound matrix routines are offloaded via \texttt{asyncio.get\_event\_loop().run\_in\_executor(None, ...)}, preventing ASGI event loop blocking.
 
 \subsection{Frontend and Visualization}
-The user interface is engineered as an interactive, single-page Web GIS application. Built with vanilla JavaScript and Leaflet 1.9.4, it features:
-\begin{enumerate}
-    \item \textbf{Dual Cartographic Viewports:} Seamless toggle between CARTO Dark Matter (optimized for vector overlay contrast) and Esri World Imagery (high-resolution satellite imagery).
-    \item \textbf{Interactive Land Area Selection:} Using Leaflet.Draw, users can sketch an arbitrary polygon bounding their available agricultural property. The frontend computes the geometric intersection against the contour bounding box using Turf.js, restricting pond candidate generation strictly to legally accessible land.
-    \item \textbf{Layer Control Panel:} Real-time independent visibility toggles for 1m elevation contours, vector drainage streams, candidate pond markers, watershed boundaries, and topographic hillshade.
-    \item \textbf{Interactive Result Badges and Metrics HUD:} Upon selecting a candidate or clicking an arbitrary point on the map, a floating Heads-Up Display (HUD) dynamically displays: (a) Catchment Drainage Area ($A$), (b) Estimated Annual Inflow Volume ($V$), (c) Recommended Pond Depth and Footprint, and (d) Catchment-to-Storage Inflow Safety Ratio.
-    \item \textbf{Dynamic Parameter Tuning Drawer:} Sliders allowing users to interactively adjust annual rainfall ($200\text{--}2000\,\text{mm}$) and soil runoff coefficient ($0.10\text{--}0.60$), recalculating volume instantly in the browser without re-querying the backend.
-\end{enumerate}
+Built with Leaflet 1.9.4, the client provides:
+(1) Dual CARTO Dark Matter and Esri Satellite basemap toggles;
+(2) Interactive land selection using Leaflet.Draw to restrict candidates within user property lines;
+(3) Dynamic layer controls for contours, streams, pond markers, and watershed polygons; and
+(4) A floating HUD displaying catchment area, expected runoff volume, recommended pond depth, and inflow safety ratio. Dynamic sliders permit instant recalculation of rainfall and runoff coefficients in the browser.
 
 \begin{figure}[h]
   \centering
   \fbox{
-    \begin{minipage}{0.9\linewidth}
+    \begin{minipage}{0.88\linewidth}
       \centering
-      \vspace{0.4cm}
-      \textbf{[ Interactive Web GIS Frontend Interface ]} \\
-      \vspace{0.2cm}
-      \small
-      $\bullet$ Basemap: CARTO Dark Matter / Esri Satellite Layer \\
-      $\bullet$ Overlays: 1m Contour Polylines + D8 Drainage Stream Lines \\
-      $\bullet$ Interactive Feature: User Land Polygon (Leaflet.Draw) \\
-      $\bullet$ Recommended Site: Top MCE Pond Location (Depth: 2.5m) \\
-      $\bullet$ Watershed: Delineated Catchment Polygon ($32,450\,\text{m}^2$) \\
-      $\bullet$ HUD Metrics: Catchment: $3.25\,\text{ha}$ | Runoff: $10.79\,\text{ML}$ \\
-      \vspace{0.4cm}
+      \vspace{2pt}
+      \textbf{[ Web GIS Interface Overview ]} \\
+      \scriptsize
+      $\bullet$ Basemaps: CARTO Dark Matter / Esri Satellite \quad $\bullet$ Contours: 1m Polylines \\
+      $\bullet$ Selection: User-Drawn Land Polygon \quad $\bullet$ Catchment: $3.25\,\text{ha}$ Watershed \\
+      $\bullet$ Recommended Pond: 2.5m Depth, $3,750\,\text{m}^3$ \quad $\bullet$ Inflow Volume: $10.79\,\text{ML}$ \\
+      \vspace{2pt}
     \end{minipage}
   }
-  \caption{Application interface showing the results overlay: delineated watershed polygon, recommended pond marker, and real-time hydrological HUD.}
+  \caption{Application interface overview showing results overlay and real-time hydrological HUD.}
   \label{fig:ui}
-  \Description{Schematic of the Leaflet-based Web GIS frontend showing satellite imagery, contour lines, delineated watershed polygon, pond marker, and dynamic runoff volume card.}
+  \Description{Overview of the Leaflet Web GIS showing map overlays and metrics.}
 \end{figure}
 
-\subsection{Database and Storage}
-The system adopts a high-efficiency stateless architecture. Rather than introducing persistent relational database latency (e.g., PostgreSQL/PostGIS) for transient analytical workflows, spatial datasets are ingested and transformed in-memory. Intermediate DEM arrays, flow direction matrices, and \texttt{UpstreamGraph} instances are cached in memory using Python dictionaries indexed by dataset hash tokens. This permits instantaneous multi-point catchment queries. Final results can be exported on demand into portable standard formats, including GeoJSON FeatureCollections, CSV summary tables, and GeoPackage files for archival in external village record systems.
+\subsection{Data Management}
+The architecture is completely stateless. Uploaded contours and intermediate matrices are processed in-memory and cached by dataset hash tokens, eliminating persistent database latency while allowing export to GeoJSON, CSV, and GeoPackage formats.
 
 %% =====================================================================
 \section{CSD Themes and Topics Applied in the Project}
 \label{sec:csd-themes}
-Table~\ref{tab:csd-themes} details how foundational Computer System Design (CSD) concepts were concretely incorporated into the system's design and implementation.
+Table~\ref{tab:csd-themes} maps core Computer System Design (CSD) principles to concrete engineering implementations within the project.
 
 \begin{table*}[t]
-  \caption{Mapping of core CSD themes/topics to their use in this project}
+  \footnotesize
+  \caption{Mapping of core CSD themes and topics to system implementation}
   \label{tab:csd-themes}
   \begin{tabular}{p{3.2cm}p{4.8cm}p{6.8cm}}
     \toprule
     CSD Theme/Topic & Where used in the project & Justification / design rationale \\
     \midrule
-    API Design (REST) & \texttt{backend/app/routes.py} (\texttt{/api/v1/analyze}, \texttt{/catchment/custom}) & Resource-oriented versioned REST API. Enforces strict Pydantic schemas, explicit HTTP response status codes, and standard GeoJSON output contracts. \\
-    Load Balancing \& Reverse Proxy & Deployment architecture with fixed port forwarding ($5252 \to 5000$) & Decouples internal container port from external access point; permits horizontal worker scaling behind reverse proxies without client reconfiguration. \\
-    Caching & In-memory flow graph memoization and tile layer caching & Pre-calculated \texttt{UpstreamGraph} CSR arrays are retained in memory, reducing subsequent catchment click queries from $700\,\text{ms}$ to $<1\,\text{ms}$. \\
-    Database / Spatial Indexing & Flat CSR adjacency indexing and Shapely \texttt{STRtree} & Avoids exhaustive $O(M \cdot H)$ pixel iteration. Spatial R-tree indexing enables rapid point-in-polygon queries during user boundary clipping. \\
-    Concurrency / Async Processing & \texttt{asyncio} event loop with \texttt{concurrent.futures.ThreadPoolExecutor} & Prevents CPU-bound matrix math (NumPy/SciPy) from blocking the asynchronous event loop, preserving high I/O throughput for concurrent client requests. \\
-    Microservices vs. Monolith & Modular service-oriented monolith in \texttt{backend/app/services/} & Avoids distributed network latency and operational complexity of microservices while maintaining strict modular separation between parsing, DEM, and hydrology. \\
-    Design Patterns & Pipeline Pattern and Strategy Pattern & Pipeline pattern orchestrates sequential data transformations (KML $\to$ DEM $\to$ Flow $\to$ MCE $\to$ GeoJSON); Strategy pattern allows dynamic interpolation swapping. \\
-    Authentication / Security & CARTO Basemap API token parameterization and CORS configuration & Secures commercial tile access via authorized credential forwarding; enforces strict CORS origins to prevent unauthorized cross-site API invocation. \\
-    Containerization / Deployment & Linux container deployment with automated startup scripts & Encapsulates Python C-extension dependencies (GDAL/GEOS/PROJ) in a reproducible environment, deployed via background daemons with port forwarding. \\
-    Error Handling \& Resilience & Geometric boundary fallbacks and validation exception handlers & Gracefully handles concave contour boundaries, division-by-zero on flat terrain, and non-convergent Delaunay edge triangles with informative HTTP error payloads. \\
-    Algorithms \& Complexity & Delaunay ($O(N \log N)$) and Inverted CSR Graph BFS ($O(K)$) & Replaces brute-force spatial scanning with topologically optimal graph algorithms, ensuring sub-second execution on large elevation grids. \\
-    Testing Strategy & Automated test suite in \texttt{backend/tests/} & Pytest suite verifying endpoint status codes, coordinate transformation accuracy, and conservation of mass in hydrological flow accumulation arrays. \\
-    Version Control / CI-CD & Git repository on GitHub with clean branch separation & Tracks functional iterations, enforces strict `.gitignore` rules to isolate server credentials, and provides reproducible submission snapshots. \\
+    API Design (REST) & \texttt{backend/app/routes.py} (\texttt{/api/v1/analyze}, \texttt{/catchment}) & Versioned REST endpoints with strict Pydantic schemas, HTTP status codes, and GeoJSON contracts. \\
+    Reverse Proxy / Forwarding & Deployment architecture ($5252 \to 5000$) & Decouples internal container port from external access point; permits horizontal worker scaling. \\
+    Caching & In-memory CSR flow graph memoization & Retains pre-computed \texttt{UpstreamGraph} in memory, reducing catchment queries from $700\,\text{ms}$ to $<1\,\text{ms}$. \\
+    Database / Spatial Indexing & CSR adjacency indexing and Shapely STRtree & Replaces $O(M \cdot H)$ pixel iteration; enables sub-millisecond point-in-polygon clipping. \\
+    Concurrency / Async & \texttt{asyncio} loop with \texttt{ThreadPoolExecutor} & Prevents CPU-bound NumPy/SciPy operations from blocking the ASGI loop, preserving client throughput. \\
+    Microservices vs. Monolith & Modular service-oriented monolith & Eliminates distributed network overhead while maintaining clean module separation for parsing, DEM, and hydrology. \\
+    Design Patterns & Pipeline and Strategy patterns & Pipeline pattern chains data transformations (KML $\to$ DEM $\to$ MCE); Strategy pattern enables swappable interpolators. \\
+    Security & CARTO API token parameterization \& CORS & Secures commercial basemap access via token forwarding; enforces strict CORS origins against CSRF. \\
+    Containerization & Linux container deployment with daemons & Encapsulates GDAL/PROJ dependencies in a reproducible environment deployed with background daemons. \\
+    Error Handling \& Resilience & Geometric fallbacks \& Pydantic handlers & Gracefully handles concave contour boundaries, zero-division on flat terrain, and edge cases. \\
+    Algorithms \& Complexity & Delaunay ($O(N\log N)$) \& CSR BFS ($O(K)$) & Replaces brute-force spatial scanning with topologically optimal graph algorithms. \\
+    Testing Strategy & Pytest automated test suite & Verifies API status codes, coordinate reprojection, and conservation of mass in flow accumulation. \\
+    Version Control / CI-CD & Git repository with branch isolation & Tracks functional commits, isolates sensitive credentials in \texttt{.gitignore}, and provides reproducible builds. \\
     \bottomrule
   \end{tabular}
 \end{table*}
 
-Among the design themes implemented, three warrant deeper engineering examination:
-\begin{enumerate}
-    \item \textbf{Asynchronous Worker Offloading for Scientific Computing:} Standard Python web servers running CPU-bound NumPy operations inside async coroutines inadvertently block the single-threaded event loop, leading to catastrophic request starvation under concurrent access. We resolved this by explicitly wrapping all analytical methods (\texttt{execute\_full\_pipeline}, \texttt{build\_dem}, \texttt{calculate\_flow\_direction}) inside \texttt{run\_in\_executor(None, ...)}. This decouples HTTP socket multiplexing from numerical matrix computation.
-    \item \textbf{Inverted CSR Flow Graph for Sub-Millisecond Watershed Delineation:} Traditional hydrological GIS routines re-compute upstream flow trees on demand or execute full-grid scans. By constructing an inverted topological graph during the initial DEM pass, storing source-target node mappings in contiguous flattened arrays with pre-indexed pointer offsets, upstream drainage basin extraction reduces to an elementary BFS traversal. Delineation latency drops from several seconds to under $1\,\text{ms}$, making real-time map-click queries instantaneous.
-    \item \textbf{Decoupled Zero-Install Web GIS Architecture:} Rather than mandating that end-users install desktop GIS software (e.g., QGIS, requiring $>1\,\text{GB}$ disk space and complex GDAL configurations), the entire analytical pipeline was architected around standard GeoJSON payloads consumed by Leaflet.js. This democratic architectural choice enables village administrators to execute professional-grade hydrological modeling directly from basic tablets or field laptops.
-\end{enumerate}
+Key engineering rationales include: (1) \emph{Async Worker Offloading}: Decouples HTTP socket handling from heavy NumPy matrix computation; (2) \emph{Inverted CSR Flow Graph}: Enables instant BFS upstream watershed extraction; and (3) \emph{Zero-Install Web GIS}: Eliminates bulky desktop GIS installations for village administrators.
 
 %% =====================================================================
 \section{Results and Evaluation}
 \label{sec:results}
-The system was evaluated using a high-density, real-world 1-meter contour elevation survey dataset (\texttt{contours\_1m.kml}) encompassing a rural micro-watershed in Andhra Pradesh, India (approximate center coordinates: $17.65^\circ\,\text{N}, 82.95^\circ\,\text{E}$).
+The system was evaluated using a 1-meter contour elevation survey dataset (\texttt{contours\_1m.kml}) covering a rural micro-watershed in Andhra Pradesh, India ($17.65^\circ\,\text{N}, 82.95^\circ\,\text{E}$).
 
-\begin{figure}[h]
-  \centering
-  \fbox{
-    \begin{minipage}{0.9\linewidth}
-      \centering
-      \vspace{0.4cm}
-      \textbf{[ Evaluated Watershed Catchment \& Pond Candidate Results ]} \\
-      \vspace{0.2cm}
-      \small
-      $\bullet$ Topographic Relief: $102.4\,\text{m}$ to $128.7\,\text{m}$ ($\Delta z = 26.3\,\text{m}$) \\
-      $\bullet$ Optimal Site Coordinates: UTM (707120 E, 1952480 N) \\
-      $\bullet$ Siting Criteria: Flow Acc: 32,450 cells | Slope: $2.1^\circ$ (Gentle) \\
-      $\bullet$ Contributing Catchment Area: $32,450\,\text{m}^2$ ($3.245\,\text{ha}$) \\
-      $\bullet$ Mean Annual Precipitation: $950\,\text{mm}$ (IMD Monsoon Normal) \\
-      $\bullet$ Runoff Volume: $V = 0.35 \times 0.950\,\text{m} \times 32,450\,\text{m}^2 = \mathbf{10,789.6\,\text{m}^3}$ \\
-      $\bullet$ Proposed Pond Sizing: $50\,\text{m} \times 30\,\text{m} \times 2.5\,\text{m}$ ($3,750\,\text{m}^3$ capacity) \\
-      $\bullet$ Inflow Safety Ratio: $10,789.6 / 3,750 = \mathbf{2.87\times}$ (Safe Full Storage) \\
-      \vspace{0.4cm}
-    \end{minipage}
-  }
-  \caption{Quantitative results summary for the evaluated micro-watershed in Andhra Pradesh.}
-  \label{fig:results}
-  \Description{Summary card detailing topographic relief, optimal pond coordinates, catchment area, annual rainfall, computed runoff volume, and recommended pond dimensions.}
-\end{figure}
+\subsection{Hydrological Analysis and Sizing}
+The surveyed terrain spans $4.52\,\text{hectares}$ ($45,200\,\text{m}^2$) with elevations between $102.4\,\text{m}$ and $128.7\,\text{m}$ ($\Delta z = 26.3\,\text{m}$). Interpolation at $\delta = 1.0\,\text{m}$ produced a grid of $250 \times 220$ cells ($55,000$ elevation nodes). The top MCE pond candidate was identified at elevation $104.2\,\text{m}$ with a gentle $2.1^\circ$ slope, draining an upstream catchment of $32,450\,\text{m}^2$ ($3.245\,\text{ha}$, $71.8\%$ of surveyed area).
 
-\subsection{Hydrological Analysis and Pond Recommendation}
-The survey dataset covered a total planimetric area of $4.52\,\text{hectares}$ ($45,200\,\text{m}^2$) with elevations ranging from $102.4\,\text{m}$ to $128.7\,\text{m}$, representing a rugged relief of $26.3\,\text{meters}$. 
-
-Interpolation at $\delta = 1.0\,\text{meter}$ generated a raster grid of $250 \times 220$ cells ($55,000$ elevation nodes). The D8 algorithm successfully extracted the primary drainage spine flowing from northeast to southwest. The top-ranked pond candidate identified by MCE scoring exhibited the following characteristics:
-\begin{itemize}
-    \item \textbf{Location:} Topographic depression at elevation $104.2\,\text{m}$, characterized by a gentle local slope of $2.1^\circ$ (preventing scouring while facilitating natural ponding).
-    \item \textbf{Delineated Catchment Area:} An upstream watershed of $32,450\,\text{m}^2$ ($3.245\,\text{ha}$), representing $71.8\%$ of the total surveyed terrain.
-    \item \textbf{Harvestable Runoff Estimation:} Assuming local monsoon precipitation of $P = 950\,\text{mm}$ and an agricultural clay-loam runoff coefficient of $C = 0.35$:
-    \begin{equation}
-        V_{\text{runoff}} = 0.35 \times \left(\frac{950}{1000}\right) \times 32,450 = 10,789.6\,\text{m}^3 \approx 10.79\,\text{ML}
-    \end{equation}
-    \item \textbf{Recommended Pond Dimensions:} A rectangular farm pond measuring $50\,\text{m} \times 30\,\text{m}$ at the surface, with side slopes of $1.5:1$ and an excavated depth of $2.5\,\text{m}$, providing an effective storage capacity of approximately $3,750\,\text{m}^3$.
-    \item \textbf{Inflow Safety Ratio:} The ratio of seasonal runoff to pond storage capacity is:
-    \begin{equation}
-        R = \frac{10,789.6\,\text{m}^3}{3,750.0\,\text{m}^3} = 2.87
-    \end{equation}
-    This ratio satisfies the recommended empirical guideline ($2.0 \le R \le 4.0$), confirming that the pond will reliably fill to capacity even during below-average monsoon seasons, with surplus water channeled through a grassed spillway to recharge downstream groundwater.
-\end{itemize}
+Assuming local annual rainfall of $P = 950\,\text{mm}$ and clay-loam runoff coefficient $C = 0.35$, the expected annual harvestable runoff is:
+\begin{equation}
+    V_{\text{runoff}} = 0.35 \times \left(\frac{950}{1000}\right) \times 32,450 = 10,789.6\,\text{m}^3 \approx 10.79\,\text{ML}
+\end{equation}
+A farm pond sized at $50\,\text{m} \times 30\,\text{m} \times 2.5\,\text{m}$ yields an effective storage capacity of $3,750\,\text{m}^3$. The inflow safety ratio is:
+\begin{equation}
+    R = \frac{10,789.6\,\text{m}^3}{3,750.0\,\text{m}^3} = 2.87
+\end{equation}
+This satisfies empirical design guidelines ($2.0 \le R \le 4.0$), ensuring the pond reliably fills even in below-average monsoon years, with excess directed through spillways.
 
 \subsection{Performance Benchmarks}
-System execution latency was measured across $50$ iterations on a standard Linux computing instance (Intel Xeon 2.20GHz, 16GB RAM). Table~\ref{tab:benchmarks} summarizes the execution time for each pipeline stage.
+Latency was benchmarked across 50 iterations on an Intel Xeon 2.20GHz, 16GB RAM instance. Table~\ref{tab:benchmarks} summarizes execution times.
 
 \begin{table}[h]
-  \caption{Performance benchmarks for the hydrological pipeline on a 55,000-cell grid}
+  \small
+  \caption{Performance benchmarks on a 55,000-cell terrain grid}
   \label{tab:benchmarks}
   \begin{tabular}{lrr}
     \toprule
-    Pipeline Stage & Mean Latency & Relative Share \\
+    Pipeline Stage & Mean Latency & Share \\
     \midrule
-    KML Ingestion \& Coordinate Reprojection & $124\,\text{ms}$ & $10.7\%$ \\
+    KML Ingestion \& Reprojection & $124\,\text{ms}$ & $10.7\%$ \\
     SciPy 2D Delaunay DEM Interpolation & $678\,\text{ms}$ & $58.8\%$ \\
     Terrain Slope, Curvature \& TWI & $62\,\text{ms}$ & $5.4\%$ \\
-    Vectorized D8 Flow Routing \& Accumulation & $196\,\text{ms}$ & $17.0\%$ \\
-    MCE Pond Candidate Ranking \& NMS & $38\,\text{ms}$ & $3.3\%$ \\
-    GeoJSON Vector Polygonization \& Formatting & $54\,\text{ms}$ & $4.7\%$ \\
+    Vectorized D8 Flow Routing & $196\,\text{ms}$ & $17.0\%$ \\
+    MCE Pond Ranking \& Spatial NMS & $38\,\text{ms}$ & $3.3\%$ \\
+    GeoJSON Vector Polygonization & $54\,\text{ms}$ & $4.7\%$ \\
     \midrule
-    \textbf{Total End-to-End Pipeline Execution} & \textbf{1,152\,ms} & \textbf{100.0\%} \\
+    \textbf{Total Pipeline Execution} & \textbf{1,152\,ms} & \textbf{100.0\%} \\
     \bottomrule
-    \emph{Subsequent Dynamic Catchment Query (BFS)} & \emph{$0.85\,\text{ms}$} & \emph{Instantaneous} \\
+    \emph{Dynamic Catchment Query (Inverted BFS)} & \emph{$0.85\,\text{ms}$} & \emph{Instantaneous} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The entire end-to-end pipeline executes in $1.15\,\text{seconds}$, well within the established $2.0\,\text{s}$ non-functional target. Furthermore, once the DEM and flow matrices are in memory, interactive on-the-fly catchment queries execute in under $1\,\text{millisecond}$, ensuring zero perceptible lag on the user interface.
+The pipeline executes in $1.15\,\text{s}$, well within the $2.0\,\text{s}$ target, with subsequent catchment queries completing in $<1\,\text{ms}$.
 
 %% =====================================================================
 \section{Discussion and Limitations}
 \label{sec:discussion}
-The empirical results confirm that automated hydrological modeling can effectively democratize village-scale water conservation planning. By replacing manual heuristics with rigorous physical gradient routing, the risk of constructing dry or undersized farm ponds is dramatically reduced.
-
-However, several engineering limitations must be recognized:
-\begin{enumerate}
-    \item \textbf{Contour Density and Interpolation Artifacts:} The accuracy of the interpolated DEM depends directly on the spatial density of surveyed contour lines. In wide, flat valley bottoms where contours are widely spaced, linear interpolation can introduce subtle artificial terraces (``stair-stepping''), creating spurious sink depressions that require numerical smoothing.
-    \item \textbf{Simplified Runoff Physics:} The Rational Method assumes a uniform rainfall intensity and constant runoff coefficient throughout the storm event. While highly suitable for micro-watersheds ($<50\,\text{ha}$), larger agricultural catchments exhibit complex, time-varying infiltration dynamics governed by antecedent soil moisture and soil crusting. Future iterations will integrate the USDA Soil Conservation Service (SCS) Curve Number method to capture non-linear storm responses.
-    \item \textbf{Lack of Sub-Surface Soil Boring Data:} While the system accurately identifies topographic depressions with high catchment runoff, it cannot independently assess sub-surface permeability or bedrock depth without physical borehole logs. Constructing a pond in highly permeable sand without bentonite or poly-lining would result in rapid percolation losses. Consequently, the tool is designed to serve as a preliminary decision-support filter guiding targeted geotechnical inspection.
-\end{enumerate}
+The platform demonstrates that automated hydrological modeling can replace manual field heuristics and eliminate expensive desktop GIS requirements. Key limitations include: (1) \emph{Contour Spacing}: Sparse contours in flat valleys can create minor interpolation stair-stepping requiring numerical smoothing; (2) \emph{Uniform Rainfall Assumption}: The Rational Method assumes steady rainfall intensity over the catchment; future iterations will incorporate the USDA SCS Curve Number method for storm event modeling; and (3) \emph{Geotechnical Verification}: The tool acts as a spatial suitability filter and must be paired with physical soil permeability testing to prevent excessive percolation losses.
 
 %% =====================================================================
 \section{AI Tool Usage Declaration}
 \label{sec:ai-usage}
-In compliance with the course Academic Integrity and LLM Usage Policy, the author declares that artificial intelligence tools were utilized during the development of this project:
-\begin{itemize}
-    \item \textbf{Tools Utilized:} Google Gemini / Antigravity Assistant.
-    \item \textbf{Tasks Assisted by AI:}
-    \begin{enumerate}
-        \item Scaffolding boilerplate code for the FastAPI REST endpoint routes and Pydantic request/response schema declarations.
-        \item Providing reference implementation syntax for Leaflet.Draw event listeners and Turf.js spatial clipping functions.
-        \item Assisting with the formatting and LaTeX typesetting of this technical report template.
-    \end{enumerate}
-    \item \textbf{Human Review and Verification:} All core mathematical formulations (D8 steepest-descent routing, Inverted CSR graph traversal, MCE weighting, and Rational runoff calculations), algorithmic implementations, performance benchmarks, and analytical conclusions were verified, debugged, and validated by the author. The author assumes full academic responsibility for the integrity and correctness of the submitted work.
-\end{itemize}
+In compliance with the course Academic Integrity and LLM Usage Policy, Google Gemini / Antigravity was utilized for: (1) Scaffolding boilerplate FastAPI route handlers and Pydantic schemas; (2) Reference syntax for Leaflet.Draw and Turf.js event integration; and (3) LaTeX document typesetting. All core mathematical models, graph traversal algorithms, spatial calculations, and conclusions were verified, tested, and validated by the author.
 
 %% =====================================================================
 \bibliographystyle{ACM-Reference-Format}
@@ -501,59 +349,19 @@ In compliance with the course Academic Integrity and LLM Usage Policy, the autho
 \appendix
 
 \section{Source Code and Repository}
-The complete source code, frontend client, test suite, and sample datasets are publicly available on GitHub:
-\begin{center}
-    \url{https://github.com/DongaShanmukhaSivaVenkataSai/Pond-Catchment-Site-Selection-System}
-\end{center}
+Repository URL: \url{https://github.com/DongaShanmukhaSivaVenkataSai/Pond-Catchment-Site-Selection-System}
 
-\subsection{Repository Structure}
-The repository is organized into distinct, decoupled components:
 \begin{verbatim}
 Pond-Catchment-Site-Selection-System/
 |-- backend/
-|   |-- app/
-|   |   |-- services/
-|   |   |   |-- catchment.py      # UpstreamGraph CSR BFS engine
-|   |   |   |-- dem_builder.py    # SciPy Delaunay DEM interpolation
-|   |   |   |-- hydrology.py      # D8 flow routing & accumulation
-|   |   |   |-- kml_parser.py     # KML/KMZ coordinate extractor
-|   |   |   |-- pond_selector.py  # MCE scoring & spatial NMS
-|   |   |   |-- projection.py     # WGS84 -> UTM EPSG:32644 transform
-|   |   |   `-- terrain.py        # 2D gradient slope, aspect & TWI
-|   |   |-- models/schemas.py     # Pydantic validation schemas
-|   |   `-- routes.py             # REST API endpoint handlers
-|   |-- main.py                   # FastAPI app & static frontend mount
-|   `-- tests/                    # Pytest automated test suite
-|-- frontend/
-|   |-- index.html                # Responsive Web GIS dashboard
-|   |-- css/style.css             # Dark-mode GIS layout & HUD styles
-|   |-- js/
-|   |   |-- api.js                # Asynchronous REST client
-|   |   |-- app.js                # Main application orchestrator
-|   |   |-- hydrology.js          # Client-side Rational runoff math
-|   |   |-- map.js                # Leaflet map, Draw tools & overlays
-|   |   `-- ui.js                 # Drawer controls & dynamic metric cards
-|   |-- data/                     # Sample 1m contour survey KMLs
-|   `-- vendor/                   # Vendored Leaflet, Leaflet.Draw & Turf
-|-- report/                       # LaTeX technical report files
-`-- requirements.txt              # Python dependency specifications
+|   |-- app/services/ (catchment, dem_builder, hydrology, pond_selector)
+|   |-- app/routes.py & models/schemas.py
+|   `-- main.py (FastAPI app & static frontend mount)
+|-- frontend/ (index.html, css/style.css, js/app.js, map.js, api.js)
+`-- requirements.txt & report/ (CSD_Assignment1_Report.tex)
 \end{verbatim}
 
-\subsection{Execution Instructions}
-To run the system locally:
-\begin{enumerate}
-    \item Clone the repository and install dependencies:
-    \begin{verbatim}
-    git clone https://github.com/DongaShanmukhaSivaVenkataSai/Pond-Catchment-Site-Selection-System.git
-    cd Pond-Catchment-Site-Selection-System
-    pip install -r requirements.txt
-    \end{verbatim}
-    \item Launch the unified backend and frontend server:
-    \begin{verbatim}
-    uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
-    \end{verbatim}
-    \item Open \texttt{http://localhost:5000} in any modern web browser to access the Web GIS interface, or visit \texttt{http://localhost:5000/docs} for interactive OpenAPI documentation.
-\end{enumerate}
+\textbf{Execution:} Clone repository, run \texttt{pip install -r requirements.txt}, and start server via \texttt{uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload}. Access UI at \texttt{http://localhost:5000}.
 
 \end{document}
 \endinput
