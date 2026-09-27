@@ -109,102 +109,60 @@ Table~\ref{tab:requirements} maps each functional requirement to its implementat
 %% =====================================================================
 \section{System Architecture and High-Level Design}
 \label{sec:architecture}
-The platform is designed as an integrated, multi-tier geospatial system bridging an interactive browser-based Web GIS frontend with a high-performance Python ASGI backend. Figure~\ref{fig:architecture} presents an elaborated architectural diagram detailing the modular decomposition of the frontend and backend tiers, their constituent components, and the bidirectional communication bridge linking them.
+The platform is designed as an integrated, three-tier geospatial system connecting an interactive browser-based Web GIS frontend to a high-performance Python ASGI backend. Figure~\ref{fig:architecture} presents the system architecture, illustrating the component breakdown across tiers and the bidirectional communication bridge linking them.
 
 \begin{figure*}[t]
   \centering
-  \resizebox{0.95\linewidth}{!}{%
   \begin{tikzpicture}[
-    font=\sffamily\footnotesize,
-    node distance=5mm and 6mm,
-    titlebox/.style={draw=teal!90, fill=teal!15, rounded corners=4pt, line width=1pt, align=center, font=\bfseries\small, inner sep=5pt, text width=14.4cm},
-    tiercontainer/.style={draw=blue!80, fill=blue!5, rounded corners=4pt, line width=0.9pt, inner sep=6pt},
-    tiertitle/.style={font=\bfseries\footnotesize, text=blue!90!black, align=center},
-    subbox/.style={draw=indigo!75, fill=white, rounded corners=3pt, line width=0.7pt, align=left, font=\scriptsize, inner sep=4.5pt, text width=6.8cm},
-    bridgebox/.style={draw=orange!90, fill=orange!10, rounded corners=4pt, line width=0.95pt, align=left, font=\scriptsize, inner sep=5pt, text width=14.4cm},
-    arr/.style={-{Stealth[length=2.5mm]}, draw=black!75, line width=0.8pt},
-    biarr/.style={{Stealth[length=2.2mm]}-{Stealth[length=2.2mm]}, draw=orange!95!black, line width=1.1pt}
+    font=\sffamily\small,
+    node distance=9mm and 12mm,
+    tier/.style={draw=black!70, rounded corners=5pt, line width=0.9pt, align=left, inner sep=8pt, text width=14.0cm},
+    client/.style={tier, fill=teal!10, draw=teal!80},
+    bridge/.style={tier, fill=orange!12, draw=orange!85},
+    server/.style={tier, fill=blue!10, draw=blue!80},
+    flowlabel/.style={font=\sffamily\footnotesize\bfseries, align=center, fill=white, inner sep=2.5pt},
+    biarr/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, line width=1.2pt, draw=black!75}
   ]
 
-    % System Title
-    \node[titlebox] (sys) {AI-based Village Pond Planning System: End-to-End System Architecture};
-
-    % --- FRONTEND TIER ---
-    \node[subbox, below left=7mm and 1mm of sys.south] (fe_ui) {%
-      \textbf{Map \& Visualization Layer} (\texttt{map.js}, \texttt{style.css})\\[1.5pt]
-      \rule{\linewidth}{0.4pt}\\[2pt]
-      $\bullet$ \textbf{Leaflet 1.9.4:} High-performance vector map engine\\
-      $\bullet$ \textbf{CARTO Dark Matter:} Thematic basemap with API authentication\\
-      $\bullet$ \textbf{Esri World Imagery:} High-resolution satellite ground truth\\
-      $\bullet$ \textbf{Leaflet.Draw:} Land boundary polygon drawing tool\\
-      $\bullet$ \textbf{GIS Overlays:} Contours, stream networks, pond markers, basins%
+    % Tier 1: Frontend
+    \node[client] (frontend) {%
+      \textbf{\large\color{teal!80!black} 1. Frontend Presentation Tier (Web GIS Client)} \hfill \normalfont\footnotesize \texttt{http://10.1.75.51:5252}\\
+      \vspace{2pt}\hrule\vspace{4pt}
+      $\bullet$ \textbf{Interactive Map Canvas:} Leaflet 1.9.4 with authenticated CARTO Dark Matter and Esri Satellite basemaps.\\
+      $\bullet$ \textbf{Land Area Selection:} Leaflet.Draw polygon bounding tool paired with Turf.js spatial boundary clipping.\\
+      $\bullet$ \textbf{Real-Time Hydrology HUD:} Floating metrics card displaying catchment area, expected water volume, and depth.\\
+      $\bullet$ \textbf{Client-Side Controller:} \texttt{app.js} pipeline orchestrator and \texttt{hydrology.js} Rational runoff model ($V = C \cdot P \cdot A$).%
     };
 
-    \node[subbox, below right=7mm and 1mm of sys.south] (fe_logic) {%
-      \textbf{Interaction \& Hydrology Layer} (\texttt{app.js}, \texttt{hydrology.js})\\[1.5pt]
-      \rule{\linewidth}{0.4pt}\\[2pt]
-      $\bullet$ \textbf{Turf.js:} Planar spatial clipping of available land parcels\\
-      $\bullet$ \textbf{Rational Runoff Engine:} Real-time $V = C \cdot P \cdot A$ calculation\\
-      $\bullet$ \textbf{Interactive HUD:} Dynamic volume, catchment area \& depth cards\\
-      $\bullet$ \textbf{Parameter Sliders:} Live adjustment of rainfall ($P$) \& soil ($C$)\\
-      $\bullet$ \textbf{State Management:} Client-side GeoJSON layer memoization%
+    % Tier 2: Network & Gateway Bridge
+    \node[bridge, below=8mm of frontend] (gateway) {%
+      \textbf{\large\color{orange!85!black} 2. Network Bridge \& API Gateway (FastAPI ASGI)} \hfill \normalfont\footnotesize Port Forwarding: \texttt{5252} $\longleftrightarrow$ \texttt{5000}\\
+      \vspace{2pt}\hrule\vspace{4pt}
+      $\bullet$ \textbf{Port Forwarding Pipeline:} External routing from public host \texttt{10.1.75.51:5252} to internal container port \texttt{5000}.\\
+      $\bullet$ \textbf{Asynchronous Client-Server Connector:} \texttt{frontend/js/api.js} REST client with origin auto-detection.\\
+      $\bullet$ \textbf{FastAPI Application Server:} StaticFiles asset mounting at root \texttt{/}, CORS middleware, and OpenAPI docs (\texttt{/docs}).\\
+      $\bullet$ \textbf{Concurrency Control:} ThreadPoolExecutor worker offloading for non-blocking execution of CPU-bound matrix math.%
     };
 
-    % Bounding box for Frontend
-    \begin{scope}[on background layer]
-      \node[tiercontainer, fit=(fe_ui) (fe_logic)] (fe_container) {};
-    \end{scope}
-    \node[tiertitle, above=1mm of fe_ui.north west, anchor=south west] {\textbf{FRONTEND TIER (Web GIS Client)} --- Browser Runtime • Accessible at \texttt{http://10.1.75.51:5252}};
-
-    \draw[arr] (sys.south) -- (fe_container.north);
-
-    % --- NETWORK BRIDGE ---
-    \node[bridgebox, below=6mm of fe_container.south] (bridge) {%
-      \centering\textbf{\color{orange!90!black} $\Updownarrow$ \hspace{2mm} BIDIRECTIONAL NETWORK COMMUNICATION \& CONNECTION BRIDGE \hspace{2mm} $\Updownarrow$}\\[2pt]
-      \rule{\linewidth}{0.5pt}\\[2pt]
-      $\bullet$ \textbf{Port Forwarding Pipeline:} External Access \texttt{http://10.1.75.51:5252} $\longleftrightarrow$ Fixed Port Forward $\longleftrightarrow$ Container Port \texttt{5000} (Uvicorn ASGI).\\
-      $\bullet$ \textbf{API Client Module (\texttt{frontend/js/api.js}):} Asynchronous \texttt{fetch()} wrapper auto-detecting \texttt{window.location.origin}; dispatches calls.\\
-      $\bullet$ \textbf{Dataflow Contracts:} Multi-part contour uploads (\texttt{POST /api/v1/analyze}) \& JSON click coordinates (\texttt{POST /api/v1/catchment/custom}).\\
-      $\bullet$ \textbf{Response Payloads:} Standards-compliant GeoJSON FeatureCollections (streams, pond sites, catchments) + JSON metric summaries.%
+    % Tier 3: Backend Hydrological Engine
+    \node[server, below=8mm of gateway] (backend) {%
+      \textbf{\large\color{blue!80!black} 3. Backend Hydrological Analytical Engine} \hfill \normalfont\footnotesize Python 3.10+ / SciPy / NumPy / Shapely\\
+      \vspace{2pt}\hrule\vspace{4pt}
+      $\bullet$ \textbf{Coordinate Reprojection:} \texttt{projection.py} transforms geographic WGS84 coordinates to conformal UTM Zone 44N metric.\\
+      $\bullet$ \textbf{DEM Surface Generation:} \texttt{dem\_builder.py} applies 2D Delaunay bivariate linear interpolation ($\delta = 1.0\,\text{m}$ resolution).\\
+      $\bullet$ \textbf{Terrain Derivative Modeling:} \texttt{terrain.py} calculates central-difference gradient slope, aspect, and Topographic Wetness Index.\\
+      $\bullet$ \textbf{D8 Flow \& Catchment Routing:} \texttt{hydrology.py} vectors steepest descent, and \texttt{catchment.py} executes sub-ms CSR graph BFS.\\
+      $\bullet$ \textbf{MCE Pond Site Selection:} \texttt{pond\_selector.py} scores depressions ($S = 0.6\,\text{Acc} + 0.3\,\text{Slp} + 0.1\,\text{Elev}$) with Spatial NMS.%
     };
 
-    \draw[biarr] (fe_container.south) -- (bridge.north);
+    % Bidirectional Connections
+    \draw[biarr] (frontend.south) -- node[flowlabel] {HTTP REST Requests (multipart KML) $\longleftrightarrow$ GeoJSON FeatureCollections} (gateway.north);
+    \draw[biarr] (gateway.south) -- node[flowlabel] {Asynchronous Threadpool Tasks $\longleftrightarrow$ Numerical Elevation Grids \& Polygons} (backend.north);
 
-    % --- BACKEND TIER ---
-    \node[subbox, below left=7mm and 1mm of bridge.south] (be_gw) {%
-      \textbf{API Gateway \& Middleware} (\texttt{main.py}, \texttt{routes.py})\\[1.5pt]
-      \rule{\linewidth}{0.4pt}\\[2pt]
-      $\bullet$ \textbf{Uvicorn ASGI Server:} High-throughput async coroutines\\
-      $\bullet$ \textbf{StaticFiles Mount:} Directly serves \texttt{frontend/} assets at root \texttt{/}\\
-      $\bullet$ \textbf{Pydantic Validation:} Type-safe request and response schemas\\
-      $\bullet$ \textbf{ThreadPoolExecutor:} Offloads heavy NumPy/SciPy matrix computation\\
-      $\bullet$ \textbf{OpenAPI Documentation:} Automated interactive Swagger at \texttt{/docs}%
-    };
-
-    \node[subbox, below right=7mm and 1mm of bridge.south] (be_eng) {%
-      \textbf{Hydrological Domain Engine} (\texttt{backend/app/services/*})\\[1.5pt]
-      \rule{\linewidth}{0.4pt}\\[2pt]
-      $\bullet$ \textbf{kml\_parser / projection:} Reprojection to UTM Zone 44N metric\\
-      $\bullet$ \textbf{dem\_builder:} SciPy Delaunay 2D interpolation ($\delta = 1.0\,\text{m}$ resolution)\\
-      $\bullet$ \textbf{terrain:} 2D Central finite-difference gradient slope \& TWI calculation\\
-      $\bullet$ \textbf{hydrology:} Vectorized D8 steepest-descent flow direction \& accumulation\\
-      $\bullet$ \textbf{catchment:} Inverted CSR \texttt{UpstreamGraph} with sub-millisecond BFS\\
-      $\bullet$ \textbf{pond\_selector:} MCE suitability scoring ($S = 0.6\,\text{Acc} + 0.3\,\text{Slp} + 0.1\,\text{Elev}$) + NMS%
-    };
-
-    % Bounding box for Backend
-    \begin{scope}[on background layer]
-      \node[tiercontainer, fit=(be_gw) (be_eng)] (be_container) {};
-    \end{scope}
-    \node[tiertitle, above=1mm of be_gw.north west, anchor=south west] {\textbf{BACKEND TIER (FastAPI ASGI Engine)} --- Python 3.10+ • Container Port \texttt{5000} (PID 832141)};
-
-    \draw[biarr] (bridge.south) -- (be_container.north);
-
-  \end{tikzpicture}%
-  }
-  \caption{Clear, elaborated end-to-end architecture diagram showing the structural breakdown of the Frontend Web GIS tier, Backend FastAPI service tier, Hydrological Domain Engine, and the bidirectional connection bridge linking them.}
+  \end{tikzpicture}
+  \caption{System architecture showing the clear three-tier separation: (1) Frontend Web GIS Presentation Tier, (2) Network Bridge and FastAPI Gateway, and (3) Backend Hydrological Analytical Engine, along with bidirectional data contracts.}
   \label{fig:architecture}
-  \Description{Clean hierarchical architecture diagram showing frontend, backend, and their network connection bridge without overlaps.}
+  \Description{Three-tier architecture diagram showing the Web GIS frontend, FastAPI network gateway, and hydrological backend engine.}
 \end{figure*}
 
 \subsection{Technology Stack}
