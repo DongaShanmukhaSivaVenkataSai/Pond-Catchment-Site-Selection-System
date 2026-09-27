@@ -73,7 +73,7 @@ Manual theodolite and total-station field surveys are labor-intensive, slow, and
 \textbf{Out-of-Scope:} Sub-surface borehole lithological testing, structural civil design of masonry spillways or earthen bunds, dynamic hydrodynamic flood wave routing, and legal cadastral land-title dispute arbitration.
 
 %% =====================================================================
-\section{Problem Statement and Requirements}
+\section{Requirements Analysis}
 \label{sec:requirements}
 \textbf{Problem Statement:} \emph{Given elevation contour polylines and user-defined boundary constraints for a rural watershed, automatically identify optimal pond sites, delineate their contributing catchment areas, and compute harvestable runoff volume based on local precipitation and soil characteristics.}
 
@@ -361,8 +361,40 @@ The platform demonstrates that automated hydrological modeling can replace manua
 In compliance with the course Academic Integrity and LLM Usage Policy, Google Gemini / Antigravity was utilized for: (1) Scaffolding boilerplate FastAPI route handlers and Pydantic schemas; (2) Reference syntax for Leaflet.Draw and Turf.js event integration; and (3) LaTeX document typesetting. All core mathematical models, graph traversal algorithms, spatial calculations, and conclusions were verified, tested, and validated by the author.
 
 %% =====================================================================
-\bibliographystyle{ACM-Reference-Format}
-\bibliography{sample-base}
+%% Direct, self-contained References block (never empty on Overleaf)
+\begin{thebibliography}{99}
+
+\bibitem{beven1979physically}
+Keith~J. Beven and Michael~J. Kirkby. 1979.
+\newblock A physically based, variable contributing area model of basin hydrology.
+\newblock \emph{Hydrological Sciences Bulletin} 24, 1 (1979), 43--69.
+
+\bibitem{chow1988applied}
+Ven~Te Chow, David~R. Maidment, and Larry~W. Mays. 1988.
+\newblock \emph{Applied Hydrology}.
+\newblock McGraw-Hill Book Company, New York.
+
+\bibitem{critchley1991water}
+Will Critchley and Klaus Siegert. 1991.
+\newblock \emph{Water Harvesting: A Manual for the Design and Construction of Water Harvesting Schemes for Plant Production}.
+\newblock Food and Agriculture Organization of the United Nations (FAO), Rome.
+
+\bibitem{fastapi2018}
+Sebasti{\'a}n Ram{\'i}rez. 2018.
+\newblock FastAPI: High Performance, Easy to Learn, Fast to Code.
+\newblock \url{https://fastapi.tiangolo.com}.
+
+\bibitem{leaflet2010}
+Vladimir Agafonkin. 2010.
+\newblock Leaflet: An Open-Source JavaScript Library for Mobile-Friendly Interactive Maps.
+\newblock \url{https://leafletjs.com}.
+
+\bibitem{tarboton1991new}
+David~G. Tarboton. 1991.
+\newblock A new method for the determination of flow directions and upslope areas in grid digital elevation models.
+\newblock \emph{Water Resources Research} 27, 1 (1991), 309--317.
+
+\end{thebibliography}
 
 %% =====================================================================
 \appendix
