@@ -600,8 +600,9 @@ async def export_csv_endpoint(
     summary="Full End-to-End Hydrological Pipeline",
     description="Executes the complete pipeline: KML Parse → UTM Projection → DEM Interpolation → Terrain Analysis → D8 Hydrology → MCE Pond Selection → Watershed Catchment Delineation → GeoJSON Exports.",
 )
+
 async def full_pipeline_endpoint(
-    file: UploadFile = File(...),
+    contour_map: UploadFile = File(...),
     resolution_m: float = Query(default=1.0, gt=0, description="DEM resolution in meters"),
     flow_percentile: float = Query(default=10.0, ge=0, le=100),
     max_slope_degrees: float = Query(default=10.0, gt=0),
@@ -614,10 +615,10 @@ async def full_pipeline_endpoint(
     include_plots: bool = Query(default=False, description="Whether to include base64 visualization plots in response"),
     include_streams: bool = Query(default=False, description="Whether to include stream drainage network GeoJSON"),
 ):
-    if not file.filename.lower().endswith((".kml", ".kmz")):
+    if not contour_map.filename.lower().endswith((".kml", ".kmz")):
         raise HTTPException(status_code=400, detail="Only .kml or .kmz files are accepted.")
 
-    kml_bytes = await file.read()
+    kml_bytes = await contour_map.read()
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(

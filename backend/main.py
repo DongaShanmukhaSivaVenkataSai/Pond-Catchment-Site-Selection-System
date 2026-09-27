@@ -33,6 +33,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -45,29 +49,78 @@ app.add_middleware(
 # Include API Router
 app.include_router(router)
 
+# Connect Frontend
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
+if not os.path.exists(FRONTEND_DIR):
+    FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-@app.get("/", include_in_schema=False)
-async def root():
-    return {
-        "service": "Pond Detection (PD) Backend API",
-        "version": "1.0.0",
-        "status": "online",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "endpoints": {
-            "health": "GET /api/v1/health",
-            "parse_kml": "POST /api/v1/parse",
-            "contours_geojson": "POST /api/v1/contours/geojson",
-            "build_dem": "POST /api/v1/dem",
-            "terrain_analysis": "POST /api/v1/terrain",
-            "hydrology": "POST /api/v1/hydrology",
-            "streams_geojson": "POST /api/v1/streams/geojson",
-            "pond_candidates": "POST /api/v1/pond-candidates",
-            "catchment": "POST /api/v1/catchment",
-            "custom_catchment": "POST /api/v1/catchment/custom",
-            "all_catchments": "POST /api/v1/catchments/all",
-            "visualize": "POST /api/v1/visualize/{plot_type}",
-            "export_csv": "POST /api/v1/export/csv",
-            "full_pipeline": "POST /api/v1/analyze",
-        },
-    }
+if os.path.exists(FRONTEND_DIR):
+    for sub in ["css", "js", "data", "vendor"]:
+        sub_path = os.path.join(FRONTEND_DIR, sub)
+        if os.path.exists(sub_path):
+            app.mount(f"/{sub}", StaticFiles(directory=sub_path), name=sub)
+
+    @app.get("/", include_in_schema=False)
+    async def serve_frontend():
+        index_file = os.path.join(FRONTEND_DIR, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {
+            "service": "Pond Detection (PD) Backend API",
+            "version": "1.0.0",
+            "status": "online",
+            "docs": "/docs",
+        }
+
+    @app.get("/api-info", include_in_schema=False)
+    async def root():
+        return {
+            "service": "Pond Detection (PD) Backend API",
+            "version": "1.0.0",
+            "status": "online",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "endpoints": {
+                "health": "GET /api/v1/health",
+                "parse_kml": "POST /api/v1/parse",
+                "contours_geojson": "POST /api/v1/contours/geojson",
+                "build_dem": "POST /api/v1/dem",
+                "terrain_analysis": "POST /api/v1/terrain",
+                "hydrology": "POST /api/v1/hydrology",
+                "streams_geojson": "POST /api/v1/streams/geojson",
+                "pond_candidates": "POST /api/v1/pond-candidates",
+                "catchment": "POST /api/v1/catchment",
+                "custom_catchment": "POST /api/v1/catchment/custom",
+                "all_catchments": "POST /api/v1/catchments/all",
+                "visualize": "POST /api/v1/visualize/{plot_type}",
+                "export_csv": "POST /api/v1/export/csv",
+                "full_pipeline": "POST /api/v1/analyze",
+            },
+        }
+else:
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return {
+            "service": "Pond Detection (PD) Backend API",
+            "version": "1.0.0",
+            "status": "online",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "endpoints": {
+                "health": "GET /api/v1/health",
+                "parse_kml": "POST /api/v1/parse",
+                "contours_geojson": "POST /api/v1/contours/geojson",
+                "build_dem": "POST /api/v1/dem",
+                "terrain_analysis": "POST /api/v1/terrain",
+                "hydrology": "POST /api/v1/hydrology",
+                "streams_geojson": "POST /api/v1/streams/geojson",
+                "pond_candidates": "POST /api/v1/pond-candidates",
+                "catchment": "POST /api/v1/catchment",
+                "custom_catchment": "POST /api/v1/catchment/custom",
+                "all_catchments": "POST /api/v1/catchments/all",
+                "visualize": "POST /api/v1/visualize/{plot_type}",
+                "export_csv": "POST /api/v1/export/csv",
+                "full_pipeline": "POST /api/v1/analyze",
+            },
+        }

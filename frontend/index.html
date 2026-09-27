@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AquaCatch • Pond Catchment Site Selection & Water Yield System</title>
+  <meta name="description" content="Hydrological GIS platform for farm-pond site selection, watershed catchment delineation, and expected water volume estimation.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Leaflet & Leaflet Draw Vendor Styles -->
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/leaflet-draw/leaflet.draw.css">
+
+  <!-- Application Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ======================================================================
+         Top Navigation Header
+         ====================================================================== -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+            <path d="M6 14c.5 1.5 2 2.5 4 2.5s3.5-1 4-2.5"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>AquaCatch GIS</h1>
+          <p>Pond Catchment &amp; Water Volume Analysis</p>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="badge-server" id="btnServerSettings" title="Click to configure backend API connection">
+          <div class="status-dot" id="serverStatusPill"></div>
+          <span id="serverUrlText">Connecting...</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15l-3-3m0 0l3-3m-3 3h12"/></svg>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Hidden file input for custom KML -->
+        <input type="file" id="kmlFileInput" accept=".kml,.kmz" style="display:none;">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('kmlFileInput').click()" title="Upload a custom KML contour file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span id="kmlFileName">Upload KML</span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btnInfo" title="Methodology & Hydro Models">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          Help
+        </button>
+      </div>
+    </header>
+
+    <!-- ======================================================================
+         Main Workspace
+         ====================================================================== -->
+    <div class="workspace">
+      <!-- Sidebar Drawer -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Tab Navigation -->
+        <div class="sidebar-tabs">
+          <button class="tab-btn active" id="tabSelectBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Area &amp; Input
+          </button>
+          <button class="tab-btn" id="tabResultsBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+            Hydro Results
+            <span class="tab-badge" id="resultsBadge" style="display:none;">Ready</span>
+          </button>
+        </div>
+
+        <!-- Sidebar Body -->
+        <div class="sidebar-body">
+          <!-- ================= TAB 1: SELECTION & PARAMETERS ================= -->
+          <div id="tabSelectContent">
+            <!-- Land Selection Status Card -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                  Land Parcel Selection
+                </span>
+                <button class="btn btn-secondary btn-sm" id="btnClearSelection" title="Clear selection">Clear</button>
+              </div>
+
+              <!-- Selection Metrics -->
+              <div class="selection-info-box" id="selectionInfoBox">
+                <div class="info-row">
+                  <span class="info-label">Parcel Area:</span>
+                  <span class="info-value" id="selectedAreaHa">None</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Metric Footprint:</span>
+                  <span class="info-value" id="selectedAreaM2">0 m²</span>
+                </div>
+              </div>
+
+              <!-- Drawing Tools Grid -->
+              <div class="tool-grid">
+                <button class="btn btn-secondary" id="btnDrawPolygon" title="Click points on map to enclose farm parcel">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg>
+                  Draw Polygon
+                </button>
+                <button class="btn btn-secondary" id="btnDrawRectangle" title="Drag a rectangle over land area">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+                  Draw Box
+                </button>
+                <button class="btn btn-secondary" id="btnPinSite" title="Click anywhere on terrain to evaluate custom pond outlet" style="grid-column: span 2;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                  Pin Custom Pond Site
+                </button>
+              </div>
+
+              <!-- Presets -->
+              <div style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; margin-top:8px;">
+                Survey Area Presets:
+              </div>
+              <div class="preset-pills">
+                <button class="preset-pill" id="presetFull">🌐 Full Survey Area</button>
+                <button class="preset-pill" id="presetNorth">🌾 North Farm Parcel</button>
+                <button class="preset-pill" id="presetCentral">🏞️ Central Valley</button>
+                <button class="preset-pill" id="presetSouth">🌊 South Lowland</button>
+              </div>
+            </div>
+
+            <!-- Hydrological Parameters Card -->
+            <div class="card" style="margin-top:14px;">
+              <div class="card-header">
+                <span class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                  Water Yield &amp; Soil Models
+                </span>
+              </div>
+
+              <!-- Rainfall Slider -->
+              <div class="form-group">
+                <div class="form-label">
+                  <span>Annual Rainfall:</span>
+                  <span class="form-val" id="rainfallVal">1200 mm</span>
+                </div>
+                <input type="range" class="slider" id="rainfallSlider" min="400" max="2500" step="50" value="1200">
+                <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;">
+                  <span>Dry (400mm)</span>
+                  <span>Average (1200mm)</span>
+                  <span>Monsoon (2500mm)</span>
+                </div>
+              </div>
+
+              <!-- Soil Runoff Coefficient Slider -->
+              <div class="form-group">
+                <div class="form-label">
+                  <span>Runoff Coefficient (C):</span>
+                  <span class="form-val" id="runoffVal">0.35</span>
+                </div>
+                <input type="range" class="slider" id="runoffSlider" min="0.10" max="0.60" step="0.05" value="0.35">
+                <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;">
+                  <span>Sandy (0.15)</span>
+                  <span>Agri Loam (0.35)</span>
+                  <span>Clay/Rock (0.55)</span>
+                </div>
+              </div>
+
+              <!-- Planned Pond Depth -->
+              <div class="form-group">
+                <div class="form-label">
+                  <span>Excavation Depth:</span>
+                  <span class="form-val" id="depthVal">3.5 m</span>
+                </div>
+                <input type="range" class="slider" id="depthSlider" min="2.0" max="6.0" step="0.5" value="3.5">
+              </div>
+
+              <!-- Model Resolution Select -->
+              <div class="form-group" style="margin-bottom:0;">
+                <div class="form-label">
+                  <span>DEM Grid Resolution:</span>
+                </div>
+                <select id="resolutionSelect" style="width:100%; padding:6px 10px; background:rgba(30,41,59,0.8); border:1px solid var(--border-subtle); color:#fff; border-radius:var(--radius-sm); font-size:12px;">
+                  <option value="10.0" selected>10m Resolution (Fast &bull; Recommended)</option>
+                  <option value="5.0">5m Resolution (High Precision)</option>
+                  <option value="1.0">1m Resolution (Ultra Detail)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Primary Generate Action Button -->
+            <button class="btn btn-action-glow btn-full" id="btnAnalyze" style="margin-top:16px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              Generate Results for Land Area
+            </button>
+          </div>
+
+          <!-- ================= TAB 2: HYDRO RESULTS ================= -->
+          <div id="tabResultsContent" style="display:none;">
+            <!-- Star Water Volume Card -->
+            <div class="card" style="border-color:var(--border-glow); background:linear-gradient(135deg, rgba(2,132,199,0.12) 0%, rgba(6,182,212,0.06) 100%);">
+              <div class="card-header">
+                <span class="card-title" style="color:var(--primary-light);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+                  Expected Water Volume
+                </span>
+                <span style="font-size:11px; background:rgba(56,189,248,0.2); color:#38bdf8; font-weight:700; padding:2px 8px; border-radius:99px;">
+                  ANNUAL YIELD
+                </span>
+              </div>
+
+              <div style="margin-bottom:12px;">
+                <div style="font-size:32px; font-family:var(--font-display); font-weight:800; color:#fff; line-height:1;" id="volumeMegaLiters">
+                  0.00 ML
+                </div>
+                <div style="font-size:13px; color:var(--text-secondary); margin-top:6px;">
+                  <b id="volumeM3" style="color:#38bdf8;">0 m³</b> (<span id="volumeLiters">0 Liters</span>)
+                </div>
+              </div>
+
+              <!-- Water Utility Metrics -->
+              <div class="stat-list">
+                <div class="stat-item">
+                  <span class="k">Single 50mm Storm Yield:</span>
+                  <span class="v" id="volumeStormM3">0 m³</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Recommended Pond Footprint:</span>
+                  <span class="v" id="pondRecommendedDims">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Irrigation Support Potential:</span>
+                  <span class="v" id="irrigationCapacity">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Suggested Pond Location Card -->
+            <div class="card" style="margin-top:14px;">
+              <div class="card-header">
+                <span class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                  Suggested Pond Location
+                </span>
+                <span class="rank-badge" id="pondRankBadge">POND SITE #1</span>
+              </div>
+
+              <div class="stat-list">
+                <div class="stat-item">
+                  <span class="k">Coordinates:</span>
+                  <span class="v" id="pondCoordinates">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Ground Elevation:</span>
+                  <span class="v" id="pondElevation">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Local Slope:</span>
+                  <span class="v" id="pondSlope">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Draining Flow Cells:</span>
+                  <span class="v" id="pondFlowAcc">--</span>
+                </div>
+              </div>
+
+              <!-- Suitability Score Progress -->
+              <div class="suitability-bar-container">
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                  <span style="color:var(--text-muted);">MCE Suitability Score:</span>
+                  <span id="pondScoreText" style="font-weight:700; color:#10b981;">94%</span>
+                </div>
+                <div class="suitability-bar-track">
+                  <div class="suitability-bar-fill" id="pondScoreFill" style="width:94%;"></div>
+                </div>
+              </div>
+
+              <a id="pondGmapsLink" href="#" target="_blank" class="btn btn-secondary btn-full btn-sm" style="margin-top:10px; text-decoration:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                Open in Google Maps Satellite
+              </a>
+            </div>
+
+            <!-- Catchment Area Card -->
+            <div class="card" style="margin-top:14px;">
+              <div class="card-header">
+                <span class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                  Catchment Area (Watershed)
+                </span>
+              </div>
+
+              <div class="metrics-highlight">
+                <div class="metric-box">
+                  <div class="metric-label">Area (Hectares)</div>
+                  <div class="metric-value" id="catchmentAreaHa">0 ha</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Area (Square Meters)</div>
+                  <div class="metric-value" id="catchmentAreaM2" style="font-size:16px;">0 m²</div>
+                </div>
+              </div>
+
+              <div class="stat-list">
+                <div class="stat-item">
+                  <span class="k">Min Elevation:</span>
+                  <span class="v" id="catchmentElevMin">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Max Elevation:</span>
+                  <span class="v" id="catchmentElevMax">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="k">Hydrological Relief:</span>
+                  <span class="v" id="catchmentElevRelief">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Export Actions -->
+            <div style="display:flex; gap:8px; margin-top:16px;">
+              <button class="btn btn-secondary btn-full btn-sm" id="btnExportGeoJSON">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export GeoJSON
+              </button>
+              <button class="btn btn-secondary btn-full btn-sm" id="btnExportCSV">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Sidebar Toggle Collapse Button -->
+      <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle sidebar drawer">
+        <span>◀</span>
+      </button>
+
+      <!-- Leaflet Interactive Map -->
+      <main id="map"></main>
+
+      <!-- Floating Map Legend -->
+      <div class="map-legend">
+        <div class="legend-title">
+          <span>Map Overlays</span>
+          <span style="font-size:10px; color:var(--text-muted);">Layers</span>
+        </div>
+        <div class="legend-list">
+          <div class="legend-item">
+            <div class="legend-sym pond"></div>
+            <span>Suggested Pond Location</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-sym catchment"></div>
+            <span>Catchment Watershed Area</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-sym streams"></div>
+            <span>Natural Drainage Streams</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-sym contours"></div>
+            <span>Topographic Contours (2m)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-sym selection"></div>
+            <span>Selected Land Area (ROI)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Cursor Coordinates Bar -->
+      <div class="map-coords-bar" id="cursorCoords">
+        Lat: 21.25170°, Lon: 81.29700°
+      </div>
+
+      <!-- Loading Spinner Overlay -->
+      <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="spinner" style="width:36px; height:36px; border-width:3px;"></div>
+        <div style="font-size:14px; font-weight:600; color:#fff;" id="loadingText">Processing Hydrological Models...</div>
+        <div style="font-size:11px; color:var(--text-secondary);">Calculating D8 Flow Direction &bull; Accumulation &bull; Watershed Catchment</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Server Configuration Modal
+       ====================================================================== -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Backend API Connection</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px; color:var(--text-secondary);">
+          Configure the FastAPI backend server URL. If connecting through SSH port forwarding, use <code>http://localhost:5252</code>.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Backend API Base URL:</label>
+          <input type="text" id="apiBaseInput" value="http://10.1.75.51:5252" style="width:100%; padding:8px 12px; background:rgba(15,23,42,0.8); border:1px solid var(--border-subtle); color:#fff; border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:13px;">
+        </div>
+
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
+          <b>Quick Presets:</b><br>
+          &bull; <code>http://localhost:5252</code> (Port Forwarded)<br>
+          &bull; <code>http://10.1.75.51:5252</code> (Direct Remote)<br>
+          &bull; Relative origin (if frontend is served directly by backend)
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveApiBase">Save &amp; Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Help & Methodology Modal
+       ====================================================================== -->
+  <div class="modal-backdrop" id="infoModal">
+    <div class="modal-dialog" style="max-width:580px;">
+      <div class="modal-header">
+        <h3>AquaCatch Methodology &amp; Engineering</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh; overflow-y:auto; line-height:1.6; font-size:13px;">
+        <h4 style="color:var(--primary-light); margin-bottom:6px;">1. Multi-Criteria Evaluation (MCE) for Pond Siting</h4>
+        <p style="color:var(--text-secondary); margin-bottom:12px;">
+          Pond candidates are scored based on a combination of high upstream flow accumulation (60%), gentle slope &le; 8&deg; for stable earthen excavation (30%), and valley floor elevation (10%). Spatial Non-Maximum Suppression (NMS) ensures candidates are spaced at least 100 meters apart.
+        </p>
+
+        <h4 style="color:var(--primary-light); margin-bottom:6px;">2. D8 Inverted Upstream Watershed Delineation</h4>
+        <p style="color:var(--text-secondary); margin-bottom:12px;">
+          From the candidate outlet, our reverse-flow CSR graph algorithm traces all upstream grid cells whose natural runoff drains into the proposed pond location, generating an exact high-resolution watershed boundary polygon.
+        </p>
+
+        <h4 style="color:var(--primary-light); margin-bottom:6px;">3. Expected Water Volume (Rational Runoff Method)</h4>
+        <p style="color:var(--text-secondary); margin-bottom:6px;">
+          Expected annual collectible water volume is computed as:
+        </p>
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--border-subtle); padding:10px; border-radius:var(--radius-sm); font-family:var(--font-mono); color:#38bdf8; margin-bottom:10px;">
+          V = C &times; (P / 1000) &times; A
+        </div>
+        <ul style="color:var(--text-secondary); margin-left:18px; margin-bottom:12px;">
+          <li><b>V:</b> Collectible water runoff volume in cubic meters (m³) and Megaliters (ML).</li>
+          <li><b>C:</b> Runoff coefficient representing soil permeability (0.15 for sand, 0.35 for clay-loam).</li>
+          <li><b>P:</b> Annual rainfall depth in millimeters (mm).</li>
+          <li><b>A:</b> Delineated catchment area in square meters (m²).</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary modal-close">Got It</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor Scripts (Strict Tech Stack: Leaflet + Vanilla JS) -->
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet-draw/leaflet.draw.js"></script>
+  <script src="vendor/turf.min.js"></script>
+
+  <!-- Application Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
